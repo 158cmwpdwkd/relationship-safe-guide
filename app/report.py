@@ -7,7 +7,6 @@ import secrets
 # ──────────────────────────────────────────────────────────────────────────────
 
 RCL_CSS = """
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -230,8 +229,135 @@ RCL_CSS = """
     word-break: keep-all;
   }
 
-  /* postMessage 높이 전송용 */
-  html, body { height: auto !important; overflow-x: hidden; }
+  /* ══════════════════════════════════════════
+     📱 반응형 — iframe/모바일 모두 대응
+     ══════════════════════════════════════════ */
+
+  /* 패딩 자동 조절 */
+  body {
+    padding: clamp(12px, 4vw, 28px) clamp(12px, 4vw, 20px) 60px;
+  }
+
+  /* 섹션 패딩 자동 조절 */
+  .section {
+    padding: clamp(16px, 4vw, 22px) clamp(14px, 4vw, 20px);
+  }
+
+  /* 연락처 그리드: 140px 못 확보 시 자동 1열 전환 */
+  .contact-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  /* 전화번호 자동 축소 */
+  .c-num {
+    font-size: clamp(18px, 5vw, 26px);
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* 지표 그리드: 110px 못 확보 시 자동 1열 전환 */
+  .metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+
+  /* m-val 폰트 자동 조절 */
+  .m-val {
+    font-size: clamp(16px, 4vw, 20px);
+  }
+
+  /* check-item 아이콘 정렬 보정 */
+  .check-item {
+    align-items: flex-start;
+  }
+
+  /* 그리드 자식 overflow 방지 */
+  .metric-box,
+  .contact-card {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* 768px 이하 세부 조정 */
+  @media (max-width: 768px) {
+    body        { font-size: 16px; padding: 16px 14px 48px; }
+    .section    { padding: 18px 14px; margin-bottom: 12px; }
+    .tag        { font-size: 11px; }
+    .badge      { font-size: 12px; }
+    .m-label    { font-size: 11px; }
+    .sec-title  { font-size: 17px; }
+    .sec-sub    { font-size: 13px; }
+    .check-txt  { font-size: 13px; }
+    .check-sub  { font-size: 12px; }
+    .step-num   { width: 32px; height: 32px; min-width: 32px; font-size: 13px; }
+    .step-title { font-size: 14px; }
+    .step-desc  { font-size: 13px; }
+    .alert-text { font-size: 14px; }
+    .disclaimer { font-size: 12px; padding: 14px 12px; }
+  }
+ /* ===== 모바일 가독성 개선 (실제 체감용) ===== */
+@media (hover: none) and (pointer: coarse) {
+
+  /* 기본 텍스트 */
+  body {
+    font-size: 16.5px !important;   /* 17px 체감상 약간 작게 보임 → 16.5~17.5가 가장 자연스러움 */
+    line-height: 1.9 !important;    /* 줄간격 확실히 시원하게 */
+  }
+
+  /* 제목 */
+  .sec-title {
+    font-size: 19px !important;
+    line-height: 1.35 !important;
+  }
+
+  /* 설명/본문 */
+  .sec-sub,
+  .step-desc,
+  .alert-text,
+  .check-txt {
+    font-size: 15px !important;
+    line-height: 1.85 !important;
+  }
+
+  /* 회색 텍스트 대비 개선 */
+  :root {
+    --sub: rgba(240,236,232,0.78);
+  }
+
+  /* 카드 내부 여백 약간 증가 */
+  .section {
+    padding: 20px 16px !important;
+  }
+
+}
+@media (hover: none) and (pointer: coarse) {
+  .contact-grid { grid-template-columns: 1fr !important; }
+}
+/* ===== 연락처 숫자 깨짐 100% 방지 ===== */
+.contact-card { overflow: visible !important; } /* 기존 overflow:hidden 덮어쓰기 */
+
+.c-num{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: normal !important; /* 컨테이너는 줄바꿈 허용 */
+}
+
+.c-phone{
+  white-space: nowrap !important;   /* 숫자는 절대 줄바꿈 금지 */
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 좁은 모바일에서 숫자 살짝 축소 */
+@media (max-width: 420px), (hover:none) and (pointer:coarse){
+  .c-phone{ font-size: clamp(20px, 7vw, 26px) !important; }
+}
 """
 
 
@@ -468,11 +594,17 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
       <h2 class="sec-title">혼자 버티기 힘들 때</h2>
       <div class="contact-grid">
         <div class="contact-card">
-          <div class="c-num">📞 117</div>
+          <div class="c-num">
+             <span class="c-emoji">📞</span>
+             <span class="c-phone">117</span>
+          </div>
           <div class="c-label">스토킹 피해<br>상담전화</div>
         </div>
         <div class="contact-card">
-          <div class="c-num">📞 1577-0199</div>
+          <div class="c-num">
+            <span class="c-emoji">📞</span>
+            <span class="c-phone">1577-0199</span>
+          </div>
           <div class="c-label">정신건강<br>위기상담전화</div>
         </div>
       </div>
@@ -492,9 +624,25 @@ def _wrap_html(body: str) -> str:
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>관계 진단 리포트 | 리커넥트랩</title>
-  <style>{RCL_CSS}</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>제발 돼라 | 리커넥트랩</title>
+
+  <!-- 폰트: @import 대신 link -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+{RCL_CSS}
+
+  /* (추가) 터치 디바이스 기준 모바일 튜닝: iframe 스케일 이슈도 커버 */
+  @media (hover: none) and (pointer: coarse) {{
+    body {{ font-size: 15px; padding: 16px 14px 48px; }}
+    .section {{ padding: 18px 14px; }}
+    .sec-title {{ font-size: 17px; }}
+    .sec-sub {{ font-size: 13px; }}
+  }}
+  </style>
 </head>
 <body>
 {body}
@@ -505,7 +653,8 @@ def _wrap_html(body: str) -> str:
   }}
   window.addEventListener('load', function() {{
     sendHeight();
-    setTimeout(sendHeight, 500);
+    setTimeout(sendHeight, 200);
+    setTimeout(sendHeight, 600);
     setTimeout(sendHeight, 1200);
   }});
   window.addEventListener('resize', sendHeight);

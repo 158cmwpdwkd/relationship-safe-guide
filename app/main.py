@@ -174,10 +174,11 @@ def view_report(token: str, db: Session = Depends(get_db)):
             )
         )
 
-    if r.html and r.html.strip().startswith("<!DOCTYPE html"):
-        return HTMLResponse(content=r.html)
-
-    return HTMLResponse(content=make_report_html("MEDIUM", 0, "other"))
+    return HTMLResponse(content=make_report_html(
+    r.risk_level or "MEDIUM",
+    r.impulse_index or 0,
+    r.fear_type or "other"
+))
 
 
 router = APIRouter()
