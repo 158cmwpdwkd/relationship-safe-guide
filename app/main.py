@@ -211,8 +211,8 @@ def view_report(token: str, db: Session = Depends(get_db)):
     return HTMLResponse(content=html, status_code=200)
 
 from fastapi import APIRouter
-from app.db import Base, engine
-import app.models
+from .db import Base, engine
+from . import models  # (테이블 등록용 import)
 
 router = APIRouter()
 
