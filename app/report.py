@@ -385,6 +385,19 @@ RCL_CSS = """
 @media (max-width: 360px){
   .c-phone{ font-size: clamp(17px, 5.8vw, 22px) !important; }
 }
+@media (max-width: 768px) {
+
+  html.in-iframe body{
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  html.in-iframe .section{
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+}
 """
 
 
@@ -650,9 +663,9 @@ def _wrap_html(body: str) -> str:
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>제발 돼라 | 리커넥트랩</title>
+  <title>관계 진단 리포트 | 리커넥트랩</title>
 
-  <!-- 폰트: @import 대신 link -->
+  <!-- 폰트 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -660,7 +673,6 @@ def _wrap_html(body: str) -> str:
   <style>
 {RCL_CSS}
 
-  /* (추가) 터치 디바이스 기준 모바일 튜닝: iframe 스케일 이슈도 커버 */
   @media (hover: none) and (pointer: coarse) {{
     body {{ font-size: 15px; padding: 16px 14px 48px; }}
     .section {{ padding: 18px 14px; }}
@@ -670,7 +682,16 @@ def _wrap_html(body: str) -> str:
   </style>
 </head>
 <body>
+
+<script>
+  // ✅ iframe 안에서 열렸는지 감지
+  if (window.self !== window.top) {{
+    document.documentElement.classList.add('in-iframe');
+  }}
+</script>
+
 {body}
+
 <script>
   function sendHeight() {{
     var h = document.documentElement.scrollHeight;
@@ -684,6 +705,7 @@ def _wrap_html(body: str) -> str:
   }});
   window.addEventListener('resize', sendHeight);
 </script>
+
 </body>
 </html>"""
 
