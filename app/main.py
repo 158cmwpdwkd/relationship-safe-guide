@@ -12,7 +12,8 @@ from .db import Base, engine, get_db
 from .models import UserSession, Order, PaidSurvey, Report, MessageSchedule
 from .schemas import FreeSurveyIn, FreeSurveyOut, ConsentIn, PaidSurveyIn, GenerateIn, GenerateOut
 from .risk import compute_risk
-from .report import make_report_markdown, markdown_to_html, new_token, expiry_6_months
+# ★ 변경: make_report_html 사용 (markdown_to_html / make_report_markdown 제거)
+from .report import make_report_html, make_report_markdown, new_token, expiry_6_months
 
 app = FastAPI(title="Relationship Safe Guide API")
 
@@ -119,13 +120,13 @@ def generate_report(payload: GenerateIn, db: Session = Depends(get_db)):
 
     # HARD_BLOCK이면 생성 금지
     if s.risk_level == "HARD_BLOCK":
-        # Report 레코드만 남기고 BLOCKED 처리
         token = new_token()
         r = Report(
             sid=s.sid,
             status="BLOCKED",
             markdown=make_report_markdown("HARD_BLOCK", s.impulse_index, s.fear_type),
-            html=markdown_to_html(make_report_markdown("HARD_BLOCK", s.impulse_index, s.fear_type)),
+            # ★ 변경: make_report_html() 사용 → 완전한 스타일드 HTML 저장
+            html=make_report_html("HARD_BLOCK", s.impulse_index, s.fear_type),
             report_token=token,
             generated_at=datetime.utcnow(),
             expires_at=expiry_6_months(),
@@ -141,7 +142,8 @@ def generate_report(payload: GenerateIn, db: Session = Depends(get_db)):
 
     token = new_token()
     md_text = make_report_markdown(s.risk_level, s.impulse_index, s.fear_type)
-    html = markdown_to_html(md_text)
+    # ★ 변경: make_report_html() 사용 → 완전한 스타일드 HTML 저장
+    html = make_report_html(s.risk_level, s.impulse_index, s.fear_type)
 
     r = Report(
         sid=s.sid,
@@ -179,7 +181,15 @@ def view_report(token: str, db: Session = Depends(get_db)):
     if r.expires_at and datetime.utcnow() > r.expires_at:
         raise HTTPException(410, "report expired")
 
-    html = f"""<!doctype html>
+    # ★ 변경: r.html은 make_report_html()이 반환한 완전한 HTML 페이지
+    # → 별도 래퍼 불필요, 직접 반환
+    # (기존 r.html이 구형 markdown_to_html 결과인 경우를 대비해 폴백 유지)
+    if r.html and r.html.strip().startswith("<!DOCTYPE html"):
+        # 새 형식: 완전한 HTML 페이지 → 직접 반환
+        return HTMLResponse(content=r.html, status_code=200)
+
+    # 구형 레코드 폴백: 기존 html fragment를 최소 래퍼로 감싸기
+    html_page = f"""<!doctype html>
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
@@ -208,7 +218,7 @@ def view_report(token: str, db: Session = Depends(get_db)):
   </body>
 </html>
 """
-    return HTMLResponse(content=html, status_code=200)
+    return HTMLResponse(content=html_page, status_code=200)
 
 from fastapi import APIRouter
 from .db import Base, engine
