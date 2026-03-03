@@ -209,3 +209,16 @@ def view_report(token: str, db: Session = Depends(get_db)):
 </html>
 """
     return HTMLResponse(content=html, status_code=200)
+
+from fastapi import APIRouter
+from app.db import Base, engine
+import app.models
+
+router = APIRouter()
+
+@router.post("/admin/init-db")
+def init_db():
+    Base.metadata.create_all(bind=engine)
+    return {"ok": True}
+
+app.include_router(router)
