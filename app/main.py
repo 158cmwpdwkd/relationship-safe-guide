@@ -25,14 +25,10 @@ app.add_middleware(
 )
 
 
-# ── 헬스체크 ──────────────────────────────────────────────────────────────────
-
 @app.get("/health")
 def health():
     return {"ok": True}
 
-
-# ── 무료 설문 ─────────────────────────────────────────────────────────────────
 
 @app.post("/api/free-survey", response_model=FreeSurveyOut)
 def free_survey(payload: FreeSurveyIn, db: Session = Depends(get_db)):
@@ -52,8 +48,6 @@ def free_survey(payload: FreeSurveyIn, db: Session = Depends(get_db)):
     db.commit()
     return FreeSurveyOut(sid=sid, impulse_index=impulse, risk_level=level)
 
-
-# ── 동의 및 연락처 ────────────────────────────────────────────────────────────
 
 @app.post("/api/consent-and-contact")
 def consent_and_contact(payload: ConsentIn, req: Request, db: Session = Depends(get_db)):
@@ -75,8 +69,6 @@ def consent_and_contact(payload: ConsentIn, req: Request, db: Session = Depends(
     return {"ok": True}
 
 
-# ── 결제 웹훅 ─────────────────────────────────────────────────────────────────
-
 @app.post("/api/payment/webhook")
 def payment_webhook(payload: dict, db: Session = Depends(get_db)):
     order_id = payload.get("order_id")
@@ -96,8 +88,6 @@ def payment_webhook(payload: dict, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ── 유료 설문 ─────────────────────────────────────────────────────────────────
-
 @app.post("/api/paid-survey")
 def paid_survey(payload: PaidSurveyIn, db: Session = Depends(get_db)):
     o = db.get(Order, payload.order_id)
@@ -112,15 +102,12 @@ def paid_survey(payload: PaidSurveyIn, db: Session = Depends(get_db)):
     return {"ok": True, "next": "GENERATE"}
 
 
-# ── 리포트 생성 ───────────────────────────────────────────────────────────────
-
 @app.post("/api/report/generate", response_model=GenerateOut)
 def generate_report(payload: GenerateIn, db: Session = Depends(get_db)):
     s = db.get(UserSession, payload.sid)
     if not s:
         raise HTTPException(404, "sid not found")
 
-    # HARD_BLOCK
     if s.risk_level == "HARD_BLOCK":
         token = new_token()
         r = Report(
@@ -136,12 +123,10 @@ def generate_report(payload: GenerateIn, db: Session = Depends(get_db)):
         db.commit()
         return GenerateOut(status="BLOCKED", report_url=f"/r/{token}")
 
-    # 기존 READY 재사용
     existing = db.get(Report, s.sid)
     if existing and existing.status == "READY":
         return GenerateOut(status="READY", report_url=f"/r/{existing.report_token}")
 
-    # 신규 생성
     token = new_token()
     r = Report(
         sid=s.sid,
@@ -167,8 +152,6 @@ def generate_report(payload: GenerateIn, db: Session = Depends(get_db)):
     return GenerateOut(status="READY", report_url=f"/r/{token}")
 
 
-# ── 리포트 조회 ★ 구형 토큰도 새 디자인 자동 적용 ────────────────────────────
-
 @app.get("/r/{token}", response_class=HTMLResponse)
 def view_report(token: str, db: Session = Depends(get_db)):
     r = db.execute(
@@ -180,7 +163,7 @@ def view_report(token: str, db: Session = Depends(get_db)):
     if r.expires_at and datetime.utcnow() > r.expires_at:
         raise HTTPException(410, "만료된 리포트입니다")
 
-    # 세션 데이터로 항상 실시간 렌더링 → 구형/신형 토큰 모두 새 디자인 적용
+    # 항상 세션 데이터로 실시간 렌더링 → 구형 토큰도 새 디자인 자동 적용
     session = db.get(UserSession, r.sid)
     if session and session.risk_level:
         return HTMLResponse(
@@ -191,15 +174,11 @@ def view_report(token: str, db: Session = Depends(get_db)):
             )
         )
 
-    # 폴백 1: 저장된 HTML이 완전한 형태면 반환
     if r.html and r.html.strip().startswith("<!DOCTYPE html"):
         return HTMLResponse(content=r.html)
 
-    # 폴백 2: 최후 수단
     return HTMLResponse(content=make_report_html("MEDIUM", 0, "other"))
 
-
-# ── 어드민 ────────────────────────────────────────────────────────────────────
 
 router = APIRouter()
 
