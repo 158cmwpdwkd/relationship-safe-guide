@@ -463,8 +463,8 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
       <span class="tag">05 · 도움 받을 곳</span>
       <h2 class="sec-title">혼자 버티기 힘들 때</h2>
       <div class="contact-grid">
-        <div class="contact-card"><div class="c-num">📞117</div><div class="c-label">스토킹 피해<br>상담전화</div></div>
-        <div class="contact-card"><div class="c-num">📞1577-0199</div><div class="c-label">정신건강<br>위기상담전화</div></div>
+        <div class="contact-card"><div class="c-num">117</div><div class="c-label">스토킹 피해<br>상담전화</div></div>
+        <div class="contact-card"><div class="c-num">1577-0199</div><div class="c-label">정신건강<br>위기상담전화</div></div>
       </div>
     </div>
 
@@ -504,7 +504,30 @@ def _wrap_html(body: str) -> str:
 </body>
 </html>"""
 
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from .report import make_report_html
 
+app = FastAPI()
+
+@app.get("/report/{token}", response_class=HTMLResponse)
+async def view_report(token: str):
+    report_data = await db.fetch_one(
+        "SELECT * FROM reports WHERE token = :token", 
+        {"token": token}
+    )
+    
+    if not report_data:
+        raise HTTPException(status_code=404, detail="리포트를 찾을 수 없습니다")
+    
+    if report_data["expires_at"] < datetime.utcnow():
+        raise HTTPException(status_code=410, detail="만료된 리포트입니다")
+    
+    return make_report_html(
+        risk_level=report_data["risk_level"],
+        impulse=report_data["impulse"],
+        fear_type=report_data["fear_type"]
+    )
 # ── 레거시 호환 유지 ──────────────────────────────────────────────────────────
 
 def make_report_markdown(risk_level: str, impulse: int, fear_type: str) -> str:
