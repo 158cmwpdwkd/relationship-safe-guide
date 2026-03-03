@@ -393,8 +393,8 @@ RCL_CSS = """
   }
 
   html.in-iframe .section{
-    padding-left: 0px !important;
-    padding-right: 0px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
   }
 
 }
