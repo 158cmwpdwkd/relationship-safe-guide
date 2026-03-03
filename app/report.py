@@ -388,8 +388,8 @@ RCL_CSS = """
 @media (max-width: 768px) {
 
   html.in-iframe body{
-    padding-left: 6px !important;
-    padding-right: 6px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
   }
 
   html.in-iframe .section{
