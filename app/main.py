@@ -463,8 +463,8 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
       <span class="tag">05 · 도움 받을 곳</span>
       <h2 class="sec-title">혼자 버티기 힘들 때</h2>
       <div class="contact-grid">
-        <div class="contact-card"><div class="c-num">117</div><div class="c-label">스토킹 피해<br>상담전화</div></div>
-        <div class="contact-card"><div class="c-num">1577-0199</div><div class="c-label">정신건강<br>위기상담전화</div></div>
+        <div class="contact-card"><div class="c-num">📞117</div><div class="c-label">스토킹 피해<br>상담전화</div></div>
+        <div class="contact-card"><div class="c-num">📞1577-0199</div><div class="c-label">정신건강<br>위기상담전화</div></div>
       </div>
     </div>
 
