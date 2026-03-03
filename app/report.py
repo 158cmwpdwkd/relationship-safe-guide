@@ -622,14 +622,12 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
       <div class="contact-grid">
         <div class="contact-card">
           <div class="c-num">
-             <span class="c-emoji">📞</span>
              <span class="c-phone">117</span>
           </div>
           <div class="c-label">스토킹 피해<br>상담전화</div>
         </div>
         <div class="contact-card">
           <div class="c-num">
-            <span class="c-emoji">📞</span>
             <span class="c-phone">1577-0199</span>
           </div>
           <div class="c-label">정신건강<br>위기상담전화</div>
