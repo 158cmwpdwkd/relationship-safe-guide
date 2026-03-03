@@ -358,6 +358,33 @@ RCL_CSS = """
 @media (max-width: 420px), (hover:none) and (pointer:coarse){
   .c-phone{ font-size: clamp(20px, 7vw, 26px) !important; }
 }
+/* ===== 연락처(전화번호) 튀어나옴 방지 ===== */
+.contact-card{
+  overflow: hidden !important;        /* 튀어나온 텍스트 숨김 */
+}
+
+.c-num{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;                       /* flex overflow 방지 */
+}
+
+.c-phone{
+  white-space: nowrap !important;     /* 숫자는 한 줄 유지 */
+  min-width: 0;
+  max-width: 100%;
+  font-size: clamp(18px, 5.2vw, 24px) !important;  /* 26 → 24 상한 낮춤 */
+  line-height: 1.1 !important;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 아주 좁은 폰에서는 한 단계 더 줄임 */
+@media (max-width: 360px){
+  .c-phone{ font-size: clamp(17px, 5.8vw, 22px) !important; }
+}
 """
 
 
