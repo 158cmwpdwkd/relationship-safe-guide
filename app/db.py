@@ -6,7 +6,11 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+# ✅ 로컬 개발 fallback: DATABASE_URL이 없으면 sqlite 사용
+if not DATABASE_URL:
+    DATABASE_URL = "sqlite:///./dev.db"
 
 def normalize_db_url(url: str) -> str:
     """
@@ -28,9 +32,13 @@ def normalize_db_url(url: str) -> str:
     return url
 
 DATABASE_URL = normalize_db_url(DATABASE_URL)
+# ✅ sqlite일 때만 connect_args 필요
+connect_args = {}
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
 
 # (중요) sqlite connect_args 같은거 여기 넣지 말기. Postgres는 불필요.
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

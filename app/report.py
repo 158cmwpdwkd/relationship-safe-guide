@@ -462,12 +462,12 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
     mv_cls       = _m_val_class(risk_level)
 
     fear_map = {
-        "new_partner": "새로운 사람이 생길까봐",
-        "forget":      "완전히 잊혀질까봐",
-        "regret":      "나중에 후회할까봐",
-        "other":       "기타 / 혼합",
+        "fear_end_forever": "영원히 끝날까봐",
+        "fear_breakdown": "내가 무너질까봐",
+        "fear_legal_issue": "법적 문제가 생길까봐",
+        "fear_be_hated": "미움받을까봐",
     }
-    fear_label = fear_map.get(fear_type, fear_type or "기타")
+    fear_label = fear_map.get(fear_type, "기타")
     risk_label = {"HIGH": "주의", "MEDIUM": "보통", "LOW": "안정"}.get(risk_level, risk_level)
 
     # ── 위험도별 알림 박스 ───────────────────────────────────

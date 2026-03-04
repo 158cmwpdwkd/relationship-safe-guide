@@ -1,21 +1,32 @@
-from typing import List, Tuple
+# app/risk.py
+from typing import List
 
-def compute_risk(q1: int, q2: int, q3: int, red_flags: List[str]) -> Tuple[int, int, bool, str]:
-    impulse = q1 + q2 + q3  # 3~15
-    # "해당 없음" 제외
-    picked = [x for x in red_flags if x and x != "해당 없음"]
-    red_count = len(picked)
-    has_threat = any("위협" in x for x in picked)
+def compute_risk(answers: dict) -> dict:
+    q1 = int(answers["FREE_Q1_stop_work_7d"])
+    q2 = int(answers["FREE_Q2_sns_check_yesterday"])
+    q3 = int(answers["FREE_Q3_impulse_control_rate"])
+    red_flags: List[str] = answers.get("FREE_Q5_red_flags", [])
+    if "rf_none" in red_flags and len(red_flags) > 1:
+        red_flags = ["rf_none"]  # 서버에서도 방어
 
-    if has_threat or red_count >= 3:
-        level = "HARD_BLOCK"
-    elif red_count >= 1:
-        level = "SOFT_GATE"
-    elif impulse >= 11:
-        level = "HIGH"
-    elif impulse >= 7:
-        level = "MEDIUM"
+    impulse_index = q1 + q2 + q3
+    red_flag_count = len([x for x in red_flags if x != "rf_none"])
+    has_threat = "rf_threat_msg" in red_flags
+
+    if has_threat or red_flag_count >= 3:
+        risk_level = "HARD_BLOCK"
+    elif red_flag_count >= 1:
+        risk_level = "SOFT_GATE"
+    elif impulse_index >= 11:
+        risk_level = "HIGH"
+    elif impulse_index >= 7:
+        risk_level = "MEDIUM"
     else:
-        level = "LOW"
+        risk_level = "LOW"
 
-    return impulse, red_count, has_threat, level
+    return {
+        "impulse_index": impulse_index,
+        "red_flag_count": red_flag_count,
+        "has_threat": has_threat,
+        "risk_level": risk_level,
+    }

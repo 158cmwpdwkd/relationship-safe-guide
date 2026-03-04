@@ -1,36 +1,30 @@
+# app/schemas.py
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Literal
 
-class FreeSurveyIn(BaseModel):
-    q1_score: int = Field(ge=1, le=5)
-    q2_score: int = Field(ge=1, le=5)
-    q3_score: int = Field(ge=1, le=5)
-    fear_type: str  # abandonment/breakdown/legal/rejection
-    red_flags: List[str]  # ["해당 없음"] or selections
+SchemaVersion = Literal["survey_v1"]
+Stage = Literal["free", "paid"]
 
-    raw: Dict[str, Any] = {}  # 원문 보관(옵션)
+class Consent(BaseModel):
+    privacy_consent: bool
+    consent_at: Optional[str] = None
+    ip: Optional[str] = None
+    user_agent: Optional[str] = None
 
-class FreeSurveyOut(BaseModel):
-    sid: str
-    impulse_index: int
-    risk_level: str
-
-class ConsentIn(BaseModel):
-    sid: str
-    consent_collection_use: bool
-    consent_cross_border: bool
-    consent_version: str = "v1"
+class Contact(BaseModel):
     phone: str
     email: Optional[str] = None
 
-class PaidSurveyIn(BaseModel):
-    sid: str
-    order_id: str
+class SurveyIn(BaseModel):
+    schema_version: SchemaVersion
+    stage: Stage
     answers: Dict[str, Any]
+    contact: Contact
+    consent: Consent
 
-class GenerateIn(BaseModel):
+class FreeOut(BaseModel):
     sid: str
-
-class GenerateOut(BaseModel):
-    status: str
-    report_url: Optional[str] = None
+    risk_level: str
+    free_token: str
+    report_url: str
+    next: Literal["PAY", "HARD_BLOCK"]
