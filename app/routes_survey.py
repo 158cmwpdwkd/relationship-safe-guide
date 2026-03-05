@@ -1,7 +1,9 @@
 # app/routes_survey.py
-from fastapi import APIRouter, Request, HTTPException
-from datetime import datetime
+import os
 import json
+from datetime import datetime
+
+from fastapi import APIRouter, Request, HTTPException
 
 from .schemas import SurveyIn, FreeOut
 from .risk import compute_risk
@@ -11,14 +13,26 @@ from .report import expiry_6_months  # report.py에 있음
 
 router = APIRouter()
 
+# ✅ Render 환경변수 (KEY=PUBLIC_REPORT_BASE, VALUE=https://reconnectlab.co.kr)
+PUBLIC_REPORT_BASE = (os.getenv("PUBLIC_REPORT_BASE") or "").strip().rstrip("/")
+
 def issue_sid() -> str:
     import uuid
     return "S_" + uuid.uuid4().hex[:12]
 
 def issue_token(plan: str) -> str:
     import uuid
-    # token prefix는 이미 /r/{token}에서 그대로 보이니까 plan만 유지
     return f"t_{plan}_" + uuid.uuid4().hex[:18]
+
+def build_public_report_url(token: str) -> str:
+    """
+    사용자가 보게 될 '브랜딩 도메인' 결과 페이지 URL.
+    예: https://reconnectlab.co.kr/report?token=xxxx
+    """
+    if PUBLIC_REPORT_BASE:
+        return f"{PUBLIC_REPORT_BASE}/report?token={token}"
+    # 폴백(로컬/환경변수 미설정): 현재 서버에서 직접 보기
+    return f"/r/{token}"
 
 @router.post("/api/survey/free", response_model=FreeOut)
 async def submit_free(payload: SurveyIn, request: Request):
@@ -27,7 +41,7 @@ async def submit_free(payload: SurveyIn, request: Request):
 
     answers = payload.answers
 
-    # 필수키 체크(문서 고정)
+    # ✅ 필수키 체크(문서 고정)
     required = [
         "FREE_Q1_stop_work_7d",
         "FREE_Q2_sns_check_yesterday",
@@ -39,21 +53,20 @@ async def submit_free(payload: SurveyIn, request: Request):
         if k not in answers:
             raise HTTPException(status_code=400, detail=f"missing {k}")
 
+    # ✅ Q5 정규화: list 강제
+    red_flags = answers.get("FREE_Q5_red_flags") or []
+    if not isinstance(red_flags, list):
+        raise HTTPException(status_code=400, detail="FREE_Q5_red_flags must be list")
+
     sid = issue_sid()
     risk = compute_risk(answers)
 
-    # ✅ free_token 생성
+    # ✅ free token 생성
     free_token = issue_token("free")
 
     # ✅ request 기반 메타
     ip = getattr(request.client, "host", None)
     ua = request.headers.get("user-agent")
-
-    # ✅ answers 파싱/정규화
-    # - Q5는 list여야 함 (문서: multi enum)
-    red_flags = answers.get("FREE_Q5_red_flags") or []
-    if not isinstance(red_flags, list):
-        raise HTTPException(status_code=400, detail="FREE_Q5_red_flags must be list")
 
     # ✅ DB 저장
     db = SessionLocal()
@@ -62,6 +75,7 @@ async def submit_free(payload: SurveyIn, request: Request):
             sid=sid,
             created_at=datetime.utcnow(),
             free_answers_json=json.dumps(answers, ensure_ascii=False),
+
             impulse_index=int(risk.get("impulse_index", 0)),
             risk_level=str(risk.get("risk_level", "LOW")),
             fear_type=str(answers.get("FREE_Q4_main_fear", "")),
@@ -93,15 +107,15 @@ async def submit_free(payload: SurveyIn, request: Request):
     finally:
         db.close()
 
-    # ✅ report_url 생성 (base_url은 끝에 / 포함됨)
-    base = str(request.base_url).rstrip("/")
-    report_url = f"{base}/r/{free_token}"
+    # ✅ 사용자가 이동할 URL은 'reconnectlab 결과 페이지'로 고정
+    # (그 페이지가 iframe으로 Render /r/{token}을 불러오면 됨)
+    report_url = build_public_report_url(free_token)
 
-    next_step = "HARD_BLOCK" if risk["risk_level"] == "HARD_BLOCK" else "PAY"
+    next_step = "HARD_BLOCK" if risk.get("risk_level") == "HARD_BLOCK" else "PAY"
 
     return FreeOut(
         sid=sid,
-        risk_level=risk["risk_level"],
+        risk_level=risk.get("risk_level", "LOW"),
         free_token=free_token,
         report_url=report_url,
         next=next_step,
