@@ -409,8 +409,10 @@ RCL_CSS = """
 
 
 def _badge_for_risk(risk_level: str) -> str:
-    if risk_level == "HIGH":
-        return '<span class="badge danger">⚠ 주의 필요 · 충동 지수 높음</span>'
+    if risk_level == "HARD_BLOCK":
+        return '<span class="badge danger">🚫 접촉 중단 · 안전 우선</span>'
+    if risk_level in ("HIGH", "SOFT_GATE"):
+        return '<span class="badge danger">⚠ 주의 필요 · 접촉 제한</span>'
     elif risk_level == "MEDIUM":
         return '<span class="badge warning">◐ 중간 단계 · 관리 필요</span>'
     else:
@@ -418,13 +420,13 @@ def _badge_for_risk(risk_level: str) -> str:
 
 
 def _gauge_class(risk_level: str) -> str:
-    if risk_level == "HIGH":     return "bar-fill-red"
+    if risk_level in(("HIGH", "SOFT_GATE")): return "bar-fill-red"
     elif risk_level == "MEDIUM": return "bar-fill-amber"
     else:                        return "bar-fill-teal"
 
 
 def _m_val_class(risk_level: str) -> str:
-    if risk_level == "HIGH":     return "r"
+    if risk_level in ("HIGH", "SOFT_GATE"): return "r"
     elif risk_level == "MEDIUM": return "a"
     else:                        return "t"
 
@@ -471,7 +473,19 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
     risk_label = {"HIGH": "주의", "MEDIUM": "보통", "LOW": "안정"}.get(risk_level, risk_level)
 
     # ── 위험도별 알림 박스 ───────────────────────────────────
-    if risk_level == "HIGH":
+    if risk_level == "SOFT_GATE":
+        alert_html = """
+      <div class="alert-box danger">
+       <div class="alert-icon">🚫</div>
+       <div class="alert-text">
+        <strong class="r">접촉 관련 조언을 제한합니다.</strong><br>
+        상대가 불편함을 느끼거나 거부 의사를 보인 상태일 수 있어요.
+        지금은 <strong class="r">연락/접근 시도</strong>보다
+        <strong class="r">위험 행동 차단</strong>에만 집중해 주세요.
+     </div>
+    </div>"""
+    
+    elif risk_level == "HIGH":
         alert_html = """
     <div class="alert-box danger">
       <div class="alert-icon">🚨</div>
@@ -542,18 +556,52 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
     )
 
     # ── 재접촉 조건 ──────────────────────────────────────────
-    if risk_level == "HIGH":
-        contact_cond    = "충동 지수 6 이하 + 최소 2주 이상 지난 시점"
-        contact_box_cls = "danger"
-        contact_icon    = "🚫"
-    elif risk_level == "MEDIUM":
-        contact_cond    = "충동 지수 4 이하 + 감정이 차분한 낮 시간대"
-        contact_box_cls = "warn"
-        contact_icon    = "⏳"
+    if risk_level == "SOFT_GATE":
+       contact_section_html = """
+    <div class="section s-red">
+      <span class="tag">04 · 재접촉 기준</span>
+      <h2 class="sec-title">현재는 접촉 관련 안내를 제공하지 않아요</h2>
+      <div class="alert-box danger" style="margin-top:0">
+        <div class="alert-icon">🚫</div>
+        <div class="alert-text">
+          상대의 거부/불편 신호가 있는 상황에서는 접촉 가이드를 제공하면
+          오히려 법적·안전 리스크를 키울 수 있어요.<br>
+          지금은 <strong class="r">연락 시도</strong>를 멈추고,
+          <strong class="r">충동 차단 루틴</strong>에 집중해 주세요.
+        </div>
+      </div>
+    </div>
+    """
     else:
-        contact_cond    = "감정이 안정된 상태 + 상대가 연락을 거부하지 않았을 때"
-        contact_box_cls = "safe"
-        contact_icon    = "📋"
+      if risk_level == "HIGH":
+          contact_cond    = "충동 지수 6 이하 + 최소 2주 이상 지난 시점"
+          contact_box_cls = "danger"
+          contact_icon    = "🚫"
+      elif risk_level == "MEDIUM":
+          contact_cond    = "충동 지수 4 이하 + 감정이 차분한 낮 시간대"
+          contact_box_cls = "warn"
+          contact_icon    = "⏳"
+      else:
+          contact_cond    = "감정이 안정된 상태 + 상대가 연락을 거부하지 않았을 때"
+          contact_box_cls = "safe"
+          contact_icon    = "📋"
+
+      contact_section_html = f"""
+<div class="section s-rose">
+  <span class="tag">04 · 재접촉 기준</span>
+  <h2 class="sec-title">언제 연락해도 괜찮을까요?</h2>
+  <div class="alert-box {contact_box_cls}" style="margin-top:0">
+    <div class="alert-icon">{contact_icon}</div>
+    <div class="alert-text">
+      <strong>추천 재접촉 조건:</strong><br>
+      {contact_cond}
+    </div>
+  </div>
+  <p class="sec-sub" style="margin-top:12px;margin-bottom:0">
+    ※ 구체적인 연락 방법 · 타이밍 · 첫 메시지 전략은 프리미엄 리포트에서 확인하세요.
+  </p>
+</div>
+"""
 
     body = f"""
 
@@ -576,7 +624,7 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
         </div>
         <div class="metric-box">
           <div class="m-label">주요 두려움</div>
-          <div class="m-val" style="font-size:14px;color:var(--rose-lt)">{fear_label}</div>
+          <div class="m-val" style="font-size:18px;color:var(--rose-lt)">{fear_label}</div>
         </div>
         <div class="metric-box">
           <div class="m-label">감정 안정도</div>
@@ -619,21 +667,7 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
       </div>
     </div>
 
-    <!-- ④ 재접촉 안전 기준 -->
-    <div class="section s-rose">
-      <span class="tag">04 · 재접촉 기준</span>
-      <h2 class="sec-title">언제 연락해도 괜찮을까요?</h2>
-      <div class="alert-box {contact_box_cls}" style="margin-top:0">
-        <div class="alert-icon">{contact_icon}</div>
-        <div class="alert-text">
-          <strong>추천 재접촉 조건:</strong><br>
-          {contact_cond}
-        </div>
-      </div>
-      <p class="sec-sub" style="margin-top:12px;margin-bottom:0">
-        ※ 구체적인 연락 방법 · 타이밍 · 첫 메시지 전략은 프리미엄 리포트에서 확인하세요.
-      </p>
-    </div>
+   {contact_section_html}
 
     <!-- ⑤ 도움 받을 곳 -->
     <div class="section s-teal">
