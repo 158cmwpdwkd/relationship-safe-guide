@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routes_survey import router as survey_router
 from .routes_report import router as report_router
-from .routes_admin import router as admin_router
+from app.routes_admin import router as admin_router
 
 from .db import engine, Base
 from .models import UserSession, Order, PaidSurvey, Report, MessageSchedule  # 👈 중요 (등록용 import)
