@@ -1,16 +1,18 @@
+import os
+import asyncpg
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routes_survey import router as survey_router
-from .routes_report import router as report_router
+from app.routes_survey import router as survey_router
+from app.routes_report import router as report_router
 from app.routes_admin import router as admin_router
 
-from .db import engine, Base
-from .models import UserSession, Order, PaidSurvey, Report, MessageSchedule  # 👈 중요 (등록용 import)
+from app.db import engine, Base
+from app.models import UserSession, Order, PaidSurvey, Report, MessageSchedule
 
 app = FastAPI()
 
-# 개발 중 임시: 전부 허용 (런칭 전에는 아임웹 도메인만 허용으로 변경)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -25,9 +27,28 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def on_startup():
+async def startup():
+    # 1) SQLAlchemy 테이블 생성
     Base.metadata.create_all(bind=engine)
-    
+
+    # 2) asyncpg pool 생성
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("DATABASE_URL is not set")
+
+    app.state.db_pool = await asyncpg.create_pool(
+        dsn=db_url,
+        min_size=1,
+        max_size=5,
+        ssl="require",
+    )
+
+@app.on_event("shutdown")
+async def shutdown():
+    pool = getattr(app.state, "db_pool", None)
+    if pool:
+        await pool.close()
+
 app.include_router(survey_router)
 app.include_router(report_router)
 app.include_router(admin_router)
