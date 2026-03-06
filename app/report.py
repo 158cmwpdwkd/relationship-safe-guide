@@ -470,7 +470,8 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
         "fear_be_hated": "미움받을까봐",
     }
     fear_label = fear_map.get(fear_type, "기타")
-    risk_label = {"HIGH": "주의", "MEDIUM": "보통", "LOW": "안정"}.get(risk_level, risk_level)
+    risk_label = {
+        "SOFT_GATE":"접촉 제한", "HIGH": "주의", "MEDIUM": "보통", "LOW": "안정"}.get(risk_level, risk_level)
 
     # ── 위험도별 알림 박스 ───────────────────────────────────
     if risk_level == "SOFT_GATE":
