@@ -735,23 +735,23 @@ def _wrap_html(body: str, risk_level: str = "") -> str:
 {body}
 
 <script>
-  function sendHeight() {
+  function sendHeight() {{
     var h = document.documentElement.scrollHeight;
     window.parent.postMessage({ type: 'RCL_REPORT_HEIGHT', height: h }, '*');
-  }
+  }}
 
-  function sendRiskLevel() {
+  function sendRiskLevel() {{
     window.parent.postMessage({ type: 'RCL_RISK_LEVEL', risk: "{risk_level}" }, '*');
-  }
+  }}
 
-  window.addEventListener('load', function() {
+  window.addEventListener('load', function() {{
     sendRiskLevel();
 
     sendHeight();
     setTimeout(sendHeight, 200);
     setTimeout(sendHeight, 600);
     setTimeout(sendHeight, 1200);
-  });
+  }});
 
   window.addEventListener('resize', sendHeight);
 </script>
