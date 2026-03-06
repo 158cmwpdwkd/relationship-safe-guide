@@ -737,11 +737,11 @@ def _wrap_html(body: str, risk_level: str = "") -> str:
 <script>
   function sendHeight() {{
     var h = document.documentElement.scrollHeight;
-    window.parent.postMessage({ type: 'RCL_REPORT_HEIGHT', height: h }, '*');
+    window.parent.postMessage({{ type: 'RCL_REPORT_HEIGHT', height: h }}, '*');
   }}
 
   function sendRiskLevel() {{
-    window.parent.postMessage({ type: 'RCL_RISK_LEVEL', risk: "{risk_level}" }, '*');
+    window.parent.postMessage({{ type: 'RCL_RISK_LEVEL', risk: "{risk_level}" }}, '*');
   }}
 
   window.addEventListener('load', function() {{
