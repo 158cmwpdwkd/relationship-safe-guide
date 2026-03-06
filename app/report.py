@@ -454,7 +454,7 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
     </div>
     <p class="disclaimer">본 서비스는 정보 제공 목적으로만 운영됩니다.</p>
     """
-        return _wrap_html(body)
+        return _wrap_html(body, risk_level)
 
     # ── 수치 계산 ───────────────────────────────────────────
     impulse_pct  = min(round((impulse / 15) * 100), 100)
@@ -696,10 +696,10 @@ def make_report_html(risk_level: str, impulse: int, fear_type: str) -> str:
     </p>
     """
 
-    return _wrap_html(body)
+    return _wrap_html(body, risk_level)
 
 
-def _wrap_html(body: str) -> str:
+def _wrap_html(body: str, risk_level: str = "") -> str:
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -735,16 +735,24 @@ def _wrap_html(body: str) -> str:
 {body}
 
 <script>
-  function sendHeight() {{
+  function sendHeight() {
     var h = document.documentElement.scrollHeight;
-    window.parent.postMessage({{ type: 'RCL_REPORT_HEIGHT', height: h }}, '*');
-  }}
-  window.addEventListener('load', function() {{
+    window.parent.postMessage({ type: 'RCL_REPORT_HEIGHT', height: h }, '*');
+  }
+
+  function sendRiskLevel() {
+    window.parent.postMessage({ type: 'RCL_RISK_LEVEL', risk: "{risk_level}" }, '*');
+  }
+
+  window.addEventListener('load', function() {
+    sendRiskLevel();
+
     sendHeight();
     setTimeout(sendHeight, 200);
     setTimeout(sendHeight, 600);
     setTimeout(sendHeight, 1200);
-  }});
+  });
+
   window.addEventListener('resize', sendHeight);
 </script>
 
