@@ -101,73 +101,62 @@ async def session_detail(
     )
 
 
-# 최근 1시간 삭제
+# 최근 1시간 세션 삭제
 @router.post("/delete_recent_hour")
 async def delete_recent_hour(
     _: HTTPBasicCredentials = Depends(require_admin),
-    pool: asyncpg.Pool = Depends(get_pool)
+    pool: asyncpg.Pool = Depends(get_pool),
 ):
-
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
-
     async with pool.acquire() as conn:
         async with conn.transaction():
-
+            # UTC 기준 최근 1시간
             await conn.execute("""
-            DELETE FROM reports
-            WHERE sid IN (
-                SELECT sid FROM user_sessions
-                WHERE created_at >= $1
-            )
-            """, cutoff)
-
+                DELETE FROM reports
+                WHERE sid IN (
+                    SELECT sid FROM user_sessions
+                    WHERE created_at >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '1 hour'
+                )
+            """)
             await conn.execute("""
-            DELETE FROM user_sessions
-            WHERE created_at >= $1
-            """, cutoff)
+                DELETE FROM user_sessions
+                WHERE created_at >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '1 hour'
+            """)
 
     return RedirectResponse("/_admin", status_code=303)
 
-
-# 오늘 데이터 삭제
+#오늘 데이터 삭제
 @router.post("/delete_today")
 async def delete_today(
     _: HTTPBasicCredentials = Depends(require_admin),
-    pool: asyncpg.Pool = Depends(get_pool)
+    pool: asyncpg.Pool = Depends(get_pool),
 ):
-
-    now = datetime.now(timezone.utc)
-    start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
-
     async with pool.acquire() as conn:
         async with conn.transaction():
-
+            # UTC 기준 오늘 00:00 ~ 내일 00:00
             await conn.execute("""
-            DELETE FROM reports
-            WHERE sid IN (
-                SELECT sid FROM user_sessions
-                WHERE created_at >= $1
-            )
-            """, start)
-
+                DELETE FROM reports
+                WHERE sid IN (
+                    SELECT sid FROM user_sessions
+                    WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'UTC')
+                      AND created_at <  DATE_TRUNC('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day'
+                )
+            """)
             await conn.execute("""
-            DELETE FROM user_sessions
-            WHERE created_at >= $1
-            """, start)
+                DELETE FROM user_sessions
+                WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'UTC')
+                  AND created_at <  DATE_TRUNC('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day'
+            """)
 
     return RedirectResponse("/_admin", status_code=303)
 
-
-# 전체 삭제 (주의)
+#전체삭제
 @router.post("/delete_all")
 async def delete_all(
     _: HTTPBasicCredentials = Depends(require_admin),
-    pool: asyncpg.Pool = Depends(get_pool)
+    pool: asyncpg.Pool = Depends(get_pool),
 ):
-
     async with pool.acquire() as conn:
         async with conn.transaction():
-
             await conn.execute("DELETE FROM reports")
             await conn.execute("DELETE FROM user_sessions")
 
