@@ -157,7 +157,20 @@ async def delete_all(
 ):
     async with pool.acquire() as conn:
         async with conn.transaction():
-            await conn.execute("DELETE FROM reports")
-            await conn.execute("DELETE FROM user_sessions")
+            # 존재하는 테이블만 삭제(테이블명이 다를 수 있어서 방어적으로 처리)
+            # to_regclass는 테이블 없으면 NULL 반환
+            async def del_if_exists(table: str):
+                exists = await conn.fetchval("SELECT to_regclass($1)", f"public.{table}")
+                if exists:
+                    await conn.execute(f"DELETE FROM {table}")
+
+            # FK 자식 테이블부터
+            await del_if_exists("message_schedules")
+            await del_if_exists("paid_surveys")
+            await del_if_exists("orders")
+
+            # 그 다음 핵심 테이블
+            await del_if_exists("reports")
+            await del_if_exists("user_sessions")
 
     return RedirectResponse("/_admin", status_code=303)
