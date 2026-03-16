@@ -21,385 +21,395 @@
   <div class="rl-bg-glow rl-bg-glow--top" aria-hidden="true"></div>
   <div class="rl-bg-glow rl-bg-glow--bottom" aria-hidden="true"></div>
 
-  <div id="rl-paid">
-    <div class="rl-shell">
+  <!-- access check loading -->
+  <div id="rl-access-loading" class="rl-access-box">
+    <div class="rl-access-spinner"></div>
+    <p class="rl-access-title">결제 상태 확인 중입니다</p>
+    <p class="rl-access-desc">잠시만 기다려 주세요.</p>
+  </div>
 
-      <div class="rl-head">
-        <div class="rl-badge">
-          <span class="rl-badge-dot"></span>
-          ReconnectLab · 유료 심층 설문
-        </div>
-        <h2>관계 흐름과 현재 국면을<br><em>조금 더 정밀하게 확인할게요</em></h2>
-        <p class="rl-sub">총 20문항이며, 보통 4~6분 정도 걸려요.</p>
-        <div class="rl-trust-row">
-          <span class="rl-trust-item">관계 패턴 중심 분석</span>
-          <span class="rl-trust-divider"></span>
-          <span class="rl-trust-item">현재 행동 리스크 진단</span>
-        </div>
+  <!-- 설문 본문: access-check 통과 전까지 숨김 -->
+  <div id="surveyApp" style="display:none;">
+    <div id="rl-paid">
+      <div class="rl-shell">
 
-        <div class="rl-progress-wrap">
-          <div class="rl-progress-meta">
-            <span class="rl-progress-label">진행률</span>
-            <span id="rl-step-text" class="rl-progress-count">1 / 20</span>
+        <div class="rl-head">
+          <div class="rl-badge">
+            <span class="rl-badge-dot"></span>
+            ReconnectLab · 유료 심층 설문
           </div>
-          <div class="rl-progress">
-            <div id="rl-progress-bar" class="rl-progress-bar">
-              <span class="rl-progress-shine"></span>
+          <h2>관계 흐름과 현재 국면을<br><em>조금 더 정밀하게 확인할게요</em></h2>
+          <p class="rl-sub">총 20문항이며, 보통 4~6분 정도 걸려요.</p>
+          <div class="rl-trust-row">
+            <span class="rl-trust-item">관계 패턴 중심 분석</span>
+            <span class="rl-trust-divider"></span>
+            <span class="rl-trust-item">현재 행동 리스크 진단</span>
+          </div>
+
+          <div class="rl-progress-wrap">
+            <div class="rl-progress-meta">
+              <span class="rl-progress-label">진행률</span>
+              <span id="rl-step-text" class="rl-progress-count">1 / 20</span>
+            </div>
+            <div class="rl-progress">
+              <div id="rl-progress-bar" class="rl-progress-bar">
+                <span class="rl-progress-shine"></span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="rl-card">
-        <div class="rl-viewport">
-          <div id="rl-steps" class="rl-steps">
+        <div class="rl-card">
+          <div class="rl-viewport">
+            <div id="rl-steps" class="rl-steps">
 
-            <section class="rl-step active" data-step="1">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q1</span>
-                <span class="rl-q-category">관계 기간</span>
-              </div>
-              <p class="rl-q-title">관계는 얼마나 이어졌나요?</p>
-              <div class="rl-options single" data-q="PAID_Q1_duration">
-                <button type="button" data-v="short"><span class="opt-indicator"></span><span class="opt-text">3개월 미만</span></button>
-                <button type="button" data-v="early"><span class="opt-indicator"></span><span class="opt-text">3~6개월</span></button>
-                <button type="button" data-v="stable"><span class="opt-indicator"></span><span class="opt-text">6개월~1년</span></button>
-                <button type="button" data-v="deep"><span class="opt-indicator"></span><span class="opt-text">1~3년</span></button>
-                <button type="button" data-v="family"><span class="opt-indicator"></span><span class="opt-text">3년 이상</span></button>
-              </div>
-            </section>
+              <section class="rl-step active" data-step="1">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q1</span>
+                  <span class="rl-q-category">관계 기간</span>
+                </div>
+                <p class="rl-q-title">관계는 얼마나 이어졌나요?</p>
+                <div class="rl-options single" data-q="PAID_Q1_duration">
+                  <button type="button" data-v="short"><span class="opt-indicator"></span><span class="opt-text">3개월 미만</span></button>
+                  <button type="button" data-v="early"><span class="opt-indicator"></span><span class="opt-text">3~6개월</span></button>
+                  <button type="button" data-v="stable"><span class="opt-indicator"></span><span class="opt-text">6개월~1년</span></button>
+                  <button type="button" data-v="deep"><span class="opt-indicator"></span><span class="opt-text">1~3년</span></button>
+                  <button type="button" data-v="family"><span class="opt-indicator"></span><span class="opt-text">3년 이상</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="2">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q2</span>
-                <span class="rl-q-category">관계 무게감</span>
-              </div>
-              <p class="rl-q-title">당시 관계는 어느 정도였나요?</p>
-              <div class="rl-options single" data-q="PAID_Q2_relationship_weight">
-                <button type="button" data-v="some"><span class="opt-indicator"></span><span class="opt-text">썸 / 애매한 관계</span></button>
-                <button type="button" data-v="dating_light"><span class="opt-indicator"></span><span class="opt-text">가볍게 만난 연인</span></button>
-                <button type="button" data-v="dating_clear"><span class="opt-indicator"></span><span class="opt-text">명확한 연인 관계</span></button>
-                <button type="button" data-v="serious"><span class="opt-indicator"></span><span class="opt-text">진지한 미래를 이야기한 관계</span></button>
-                <button type="button" data-v="family_level"><span class="opt-indicator"></span><span class="opt-text">결혼 / 동거 수준까지 갔던 관계</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="2">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q2</span>
+                  <span class="rl-q-category">관계 무게감</span>
+                </div>
+                <p class="rl-q-title">당시 관계는 어느 정도였나요?</p>
+                <div class="rl-options single" data-q="PAID_Q2_relationship_weight">
+                  <button type="button" data-v="some"><span class="opt-indicator"></span><span class="opt-text">썸 / 애매한 관계</span></button>
+                  <button type="button" data-v="dating_light"><span class="opt-indicator"></span><span class="opt-text">가볍게 만난 연인</span></button>
+                  <button type="button" data-v="dating_clear"><span class="opt-indicator"></span><span class="opt-text">명확한 연인 관계</span></button>
+                  <button type="button" data-v="serious"><span class="opt-indicator"></span><span class="opt-text">진지한 미래를 이야기한 관계</span></button>
+                  <button type="button" data-v="family_level"><span class="opt-indicator"></span><span class="opt-text">결혼 / 동거 수준까지 갔던 관계</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="3">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q3</span>
-                <span class="rl-q-category">반복 이력</span>
-              </div>
-              <p class="rl-q-title">예전에도 헤어졌다 다시 만난 적이 있나요?</p>
-              <div class="rl-options single" data-q="PAID_Q3_reunion_history">
-                <button type="button" data-v="never"><span class="opt-indicator"></span><span class="opt-text">없다</span></button>
-                <button type="button" data-v="once"><span class="opt-indicator"></span><span class="opt-text">1번 있다</span></button>
-                <button type="button" data-v="multi"><span class="opt-indicator"></span><span class="opt-text">2번 이상 있다</span></button>
-                <button type="button" data-v="unclear"><span class="opt-indicator"></span><span class="opt-text">애매하다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="3">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q3</span>
+                  <span class="rl-q-category">반복 이력</span>
+                </div>
+                <p class="rl-q-title">예전에도 헤어졌다 다시 만난 적이 있나요?</p>
+                <div class="rl-options single" data-q="PAID_Q3_reunion_history">
+                  <button type="button" data-v="never"><span class="opt-indicator"></span><span class="opt-text">없다</span></button>
+                  <button type="button" data-v="once"><span class="opt-indicator"></span><span class="opt-text">1번 있다</span></button>
+                  <button type="button" data-v="multi"><span class="opt-indicator"></span><span class="opt-text">2번 이상 있다</span></button>
+                  <button type="button" data-v="unclear"><span class="opt-indicator"></span><span class="opt-text">애매하다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="4">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q4</span>
-                <span class="rl-q-category">이별 시점</span>
-              </div>
-              <p class="rl-q-title">헤어진 지 얼마나 되었나요?</p>
-              <div class="rl-options single" data-q="PAID_Q4_breakup_timing">
-                <button type="button" data-v="d3"><span class="opt-indicator"></span><span class="opt-text">3일 이내</span></button>
-                <button type="button" data-v="w1"><span class="opt-indicator"></span><span class="opt-text">1주 이내</span></button>
-                <button type="button" data-v="w2_4"><span class="opt-indicator"></span><span class="opt-text">2~4주</span></button>
-                <button type="button" data-v="m1_3"><span class="opt-indicator"></span><span class="opt-text">1~3개월</span></button>
-                <button type="button" data-v="m3_plus"><span class="opt-indicator"></span><span class="opt-text">3개월 이상</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="4">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q4</span>
+                  <span class="rl-q-category">이별 시점</span>
+                </div>
+                <p class="rl-q-title">헤어진 지 얼마나 되었나요?</p>
+                <div class="rl-options single" data-q="PAID_Q4_breakup_timing">
+                  <button type="button" data-v="d3"><span class="opt-indicator"></span><span class="opt-text">3일 이내</span></button>
+                  <button type="button" data-v="w1"><span class="opt-indicator"></span><span class="opt-text">1주 이내</span></button>
+                  <button type="button" data-v="w2_4"><span class="opt-indicator"></span><span class="opt-text">2~4주</span></button>
+                  <button type="button" data-v="m1_3"><span class="opt-indicator"></span><span class="opt-text">1~3개월</span></button>
+                  <button type="button" data-v="m3_plus"><span class="opt-indicator"></span><span class="opt-text">3개월 이상</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="5">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q5</span>
-                <span class="rl-q-category">마지막 연락</span>
-              </div>
-              <p class="rl-q-title">마지막으로 직접 연락이 오간 것은 언제인가요?</p>
-              <div class="rl-options single" data-q="PAID_Q5_last_contact_timing">
-                <button type="button" data-v="today_3d"><span class="opt-indicator"></span><span class="opt-text">오늘~3일 이내</span></button>
-                <button type="button" data-v="w1"><span class="opt-indicator"></span><span class="opt-text">1주 이내</span></button>
-                <button type="button" data-v="w2_4"><span class="opt-indicator"></span><span class="opt-text">2~4주</span></button>
-                <button type="button" data-v="m1_3"><span class="opt-indicator"></span><span class="opt-text">1~3개월</span></button>
-                <button type="button" data-v="m3_plus"><span class="opt-indicator"></span><span class="opt-text">3개월 이상</span></button>
-                <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">기억이 잘 안 남</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="5">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q5</span>
+                  <span class="rl-q-category">마지막 연락</span>
+                </div>
+                <p class="rl-q-title">마지막으로 직접 연락이 오간 것은 언제인가요?</p>
+                <div class="rl-options single" data-q="PAID_Q5_last_contact_timing">
+                  <button type="button" data-v="today_3d"><span class="opt-indicator"></span><span class="opt-text">오늘~3일 이내</span></button>
+                  <button type="button" data-v="w1"><span class="opt-indicator"></span><span class="opt-text">1주 이내</span></button>
+                  <button type="button" data-v="w2_4"><span class="opt-indicator"></span><span class="opt-text">2~4주</span></button>
+                  <button type="button" data-v="m1_3"><span class="opt-indicator"></span><span class="opt-text">1~3개월</span></button>
+                  <button type="button" data-v="m3_plus"><span class="opt-indicator"></span><span class="opt-text">3개월 이상</span></button>
+                  <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">기억이 잘 안 남</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="6">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q6</span>
-                <span class="rl-q-category">이별 주도권</span>
-              </div>
-              <p class="rl-q-title">누가 먼저 관계 종료 의사를 더 분명하게 밝혔나요?</p>
-              <div class="rl-options single" data-q="PAID_Q6_breakup_initiator">
-                <button type="button" data-v="me"><span class="opt-indicator"></span><span class="opt-text">내가 먼저</span></button>
-                <button type="button" data-v="other"><span class="opt-indicator"></span><span class="opt-text">상대가 먼저</span></button>
-                <button type="button" data-v="mutual"><span class="opt-indicator"></span><span class="opt-text">서로 합의에 가까웠다</span></button>
-                <button type="button" data-v="unclear"><span class="opt-indicator"></span><span class="opt-text">애매하게 끝났다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="6">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q6</span>
+                  <span class="rl-q-category">이별 주도권</span>
+                </div>
+                <p class="rl-q-title">누가 먼저 관계 종료 의사를 더 분명하게 밝혔나요?</p>
+                <div class="rl-options single" data-q="PAID_Q6_breakup_initiator">
+                  <button type="button" data-v="me"><span class="opt-indicator"></span><span class="opt-text">내가 먼저</span></button>
+                  <button type="button" data-v="other"><span class="opt-indicator"></span><span class="opt-text">상대가 먼저</span></button>
+                  <button type="button" data-v="mutual"><span class="opt-indicator"></span><span class="opt-text">서로 합의에 가까웠다</span></button>
+                  <button type="button" data-v="unclear"><span class="opt-indicator"></span><span class="opt-text">애매하게 끝났다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="7">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q7</span>
-                <span class="rl-q-category">이별 원인</span>
-              </div>
-              <p class="rl-q-title">이별의 가장 큰 원인은 무엇이었나요?</p>
-              <div class="rl-options single" data-q="PAID_Q7_breakup_reason">
-                <button type="button" data-v="personality_values"><span class="opt-indicator"></span><span class="opt-text">성격 / 가치관 차이</span></button>
-                <button type="button" data-v="trust"><span class="opt-indicator"></span><span class="opt-text">신뢰 문제</span></button>
-                <button type="button" data-v="distance_env"><span class="opt-indicator"></span><span class="opt-text">거리 / 환경 문제</span></button>
-                <button type="button" data-v="family"><span class="opt-indicator"></span><span class="opt-text">가족 / 주변 반대</span></button>
-                <button type="button" data-v="fight"><span class="opt-indicator"></span><span class="opt-text">잦은 다툼</span></button>
-                <button type="button" data-v="one_sided"><span class="opt-indicator"></span><span class="opt-text">한쪽의 감정 식음</span></button>
-                <button type="button" data-v="life_stage"><span class="opt-indicator"></span><span class="opt-text">진로 / 상황 변화</span></button>
-                <button type="button" data-v="other"><span class="opt-indicator"></span><span class="opt-text">기타</span></button>
-              </div>
+              <section class="rl-step" data-step="7">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q7</span>
+                  <span class="rl-q-category">이별 원인</span>
+                </div>
+                <p class="rl-q-title">이별의 가장 큰 원인은 무엇이었나요?</p>
+                <div class="rl-options single" data-q="PAID_Q7_breakup_reason">
+                  <button type="button" data-v="personality_values"><span class="opt-indicator"></span><span class="opt-text">성격 / 가치관 차이</span></button>
+                  <button type="button" data-v="trust"><span class="opt-indicator"></span><span class="opt-text">신뢰 문제</span></button>
+                  <button type="button" data-v="distance_env"><span class="opt-indicator"></span><span class="opt-text">거리 / 환경 문제</span></button>
+                  <button type="button" data-v="family"><span class="opt-indicator"></span><span class="opt-text">가족 / 주변 반대</span></button>
+                  <button type="button" data-v="fight"><span class="opt-indicator"></span><span class="opt-text">잦은 다툼</span></button>
+                  <button type="button" data-v="one_sided"><span class="opt-indicator"></span><span class="opt-text">한쪽의 감정 식음</span></button>
+                  <button type="button" data-v="life_stage"><span class="opt-indicator"></span><span class="opt-text">진로 / 상황 변화</span></button>
+                  <button type="button" data-v="other"><span class="opt-indicator"></span><span class="opt-text">기타</span></button>
+                </div>
 
-              <div id="rl-q7-other-wrap" class="rl-inline-input-wrap" style="display:none;">
-                <label for="rl-q7-other-input" class="rl-inline-label">기타 사유를 입력해 주세요</label>
-                <textarea
-                  id="rl-q7-other-input"
-                  class="rl-inline-textarea"
-                  placeholder="예: 종교 문제, 경제 문제, 소통방식 등"
-                  maxlength="200"
-                ></textarea>
-                <div class="rl-inline-hint"><span id="rl-q7-other-count">0</span> / 200</div>
-              </div>
-            </section>
+                <div id="rl-q7-other-wrap" class="rl-inline-input-wrap" style="display:none;">
+                  <label for="rl-q7-other-input" class="rl-inline-label">기타 사유를 입력해 주세요</label>
+                  <textarea
+                    id="rl-q7-other-input"
+                    class="rl-inline-textarea"
+                    placeholder="예: 종교 문제, 경제 문제, 소통방식 등"
+                    maxlength="200"
+                  ></textarea>
+                  <div class="rl-inline-hint"><span id="rl-q7-other-count">0</span> / 200</div>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="8">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q8</span>
-                <span class="rl-q-category">심각도</span>
-              </div>
-              <p class="rl-q-title">그 문제의 심각도는 어느 정도였나요?</p>
-              <div class="rl-options single" data-q="PAID_Q8_issue_severity">
-                <button type="button" data-v="light"><span class="opt-indicator"></span><span class="opt-text">오해 / 서운함 수준</span></button>
-                <button type="button" data-v="mid"><span class="opt-indicator"></span><span class="opt-text">반복 갈등 수준</span></button>
-                <button type="button" data-v="high"><span class="opt-indicator"></span><span class="opt-text">관계 지속이 어려울 정도</span></button>
-                <button type="button" data-v="very_high"><span class="opt-indicator"></span><span class="opt-text">큰 배신 / 상처 / 파탄 수준</span></button>
-                <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">판단이 어렵다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="8">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q8</span>
+                  <span class="rl-q-category">심각도</span>
+                </div>
+                <p class="rl-q-title">그 문제의 심각도는 어느 정도였나요?</p>
+                <div class="rl-options single" data-q="PAID_Q8_issue_severity">
+                  <button type="button" data-v="light"><span class="opt-indicator"></span><span class="opt-text">오해 / 서운함 수준</span></button>
+                  <button type="button" data-v="mid"><span class="opt-indicator"></span><span class="opt-text">반복 갈등 수준</span></button>
+                  <button type="button" data-v="high"><span class="opt-indicator"></span><span class="opt-text">관계 지속이 어려울 정도</span></button>
+                  <button type="button" data-v="very_high"><span class="opt-indicator"></span><span class="opt-text">큰 배신 / 상처 / 파탄 수준</span></button>
+                  <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">판단이 어렵다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="9">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q9</span>
-                <span class="rl-q-category">마지막 대화</span>
-              </div>
-              <p class="rl-q-title">마지막 대화의 분위기는 어땠나요?</p>
-              <div class="rl-options single" data-q="PAID_Q9_last_conversation_mood">
-                <button type="button" data-v="emotional"><span class="opt-indicator"></span><span class="opt-text">감정적으로 크게 부딪혔다</span></button>
-                <button type="button" data-v="cold_clear"><span class="opt-indicator"></span><span class="opt-text">차갑지만 명확히 정리됐다</span></button>
-                <button type="button" data-v="mixed"><span class="opt-indicator"></span><span class="opt-text">정리와 미련이 섞여 있었다</span></button>
-                <button type="button" data-v="soft_unclear"><span class="opt-indicator"></span><span class="opt-text">부드럽지만 애매하게 끝났다</span></button>
-                <button type="button" data-v="sudden_cut"><span class="opt-indicator"></span><span class="opt-text">갑자기 끊기듯 끝났다</span></button>
-                <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="9">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q9</span>
+                  <span class="rl-q-category">마지막 대화</span>
+                </div>
+                <p class="rl-q-title">마지막 대화의 분위기는 어땠나요?</p>
+                <div class="rl-options single" data-q="PAID_Q9_last_conversation_mood">
+                  <button type="button" data-v="emotional"><span class="opt-indicator"></span><span class="opt-text">감정적으로 크게 부딪혔다</span></button>
+                  <button type="button" data-v="cold_clear"><span class="opt-indicator"></span><span class="opt-text">차갑지만 명확히 정리됐다</span></button>
+                  <button type="button" data-v="mixed"><span class="opt-indicator"></span><span class="opt-text">정리와 미련이 섞여 있었다</span></button>
+                  <button type="button" data-v="soft_unclear"><span class="opt-indicator"></span><span class="opt-text">부드럽지만 애매하게 끝났다</span></button>
+                  <button type="button" data-v="sudden_cut"><span class="opt-indicator"></span><span class="opt-text">갑자기 끊기듯 끝났다</span></button>
+                  <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="10">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q10</span>
-                <span class="rl-q-category">갈등 패턴</span>
-              </div>
-              <p class="rl-q-title">평소 갈등이 생기면 가장 가까운 패턴은 무엇이었나요?</p>
-              <div class="rl-options single" data-q="PAID_Q10_conflict_pattern">
-                <button type="button" data-v="pursue_avoid"><span class="opt-indicator"></span><span class="opt-text">나는 붙잡고 상대는 피했다</span></button>
-                <button type="button" data-v="mutual_explosion"><span class="opt-indicator"></span><span class="opt-text">서로 감정적으로 커졌다</span></button>
-                <button type="button" data-v="silent_cutoff"><span class="opt-indicator"></span><span class="opt-text">말없이 멀어지는 편이었다</span></button>
-                <button type="button" data-v="one_sided_endure"><span class="opt-indicator"></span><span class="opt-text">한쪽만 참다가 터졌다</span></button>
-                <button type="button" data-v="repeat_same"><span class="opt-indicator"></span><span class="opt-text">비슷한 문제를 반복했다</span></button>
-                <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="10">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q10</span>
+                  <span class="rl-q-category">갈등 패턴</span>
+                </div>
+                <p class="rl-q-title">평소 갈등이 생기면 가장 가까운 패턴은 무엇이었나요?</p>
+                <div class="rl-options single" data-q="PAID_Q10_conflict_pattern">
+                  <button type="button" data-v="pursue_avoid"><span class="opt-indicator"></span><span class="opt-text">나는 붙잡고 상대는 피했다</span></button>
+                  <button type="button" data-v="mutual_explosion"><span class="opt-indicator"></span><span class="opt-text">서로 감정적으로 커졌다</span></button>
+                  <button type="button" data-v="silent_cutoff"><span class="opt-indicator"></span><span class="opt-text">말없이 멀어지는 편이었다</span></button>
+                  <button type="button" data-v="one_sided_endure"><span class="opt-indicator"></span><span class="opt-text">한쪽만 참다가 터졌다</span></button>
+                  <button type="button" data-v="repeat_same"><span class="opt-indicator"></span><span class="opt-text">비슷한 문제를 반복했다</span></button>
+                  <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="11">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q11</span>
-                <span class="rl-q-category">상대 반응</span>
-              </div>
-              <p class="rl-q-title">상대는 갈등 상황에서 보통 어떻게 반응했나요?</p>
-              <div class="rl-options single" data-q="PAID_Q11_partner_conflict_response">
-                <button type="button" data-v="talk_now"><span class="opt-indicator"></span><span class="opt-text">바로 대화하려 했다</span></button>
-                <button type="button" data-v="need_time"><span class="opt-indicator"></span><span class="opt-text">시간이 지나야 풀렸다</span></button>
-                <button type="button" data-v="avoid"><span class="opt-indicator"></span><span class="opt-text">대화를 피했다</span></button>
-                <button type="button" data-v="silent"><span class="opt-indicator"></span><span class="opt-text">잠수 / 읽씹 / 단절 경향이 있었다</span></button>
-                <button type="button" data-v="burst"><span class="opt-indicator"></span><span class="opt-text">감정적으로 폭발했다</span></button>
-                <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="11">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q11</span>
+                  <span class="rl-q-category">상대 반응</span>
+                </div>
+                <p class="rl-q-title">상대는 갈등 상황에서 보통 어떻게 반응했나요?</p>
+                <div class="rl-options single" data-q="PAID_Q11_partner_conflict_response">
+                  <button type="button" data-v="talk_now"><span class="opt-indicator"></span><span class="opt-text">바로 대화하려 했다</span></button>
+                  <button type="button" data-v="need_time"><span class="opt-indicator"></span><span class="opt-text">시간이 지나야 풀렸다</span></button>
+                  <button type="button" data-v="avoid"><span class="opt-indicator"></span><span class="opt-text">대화를 피했다</span></button>
+                  <button type="button" data-v="silent"><span class="opt-indicator"></span><span class="opt-text">잠수 / 읽씹 / 단절 경향이 있었다</span></button>
+                  <button type="button" data-v="burst"><span class="opt-indicator"></span><span class="opt-text">감정적으로 폭발했다</span></button>
+                  <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="12">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q12</span>
-                <span class="rl-q-category">내 문제 행동</span>
-              </div>
-              <p class="rl-q-title">내가 반복적으로 했던 문제 행동이 있다면 무엇에 가장 가까웠나요?</p>
-              <div class="rl-options single" data-q="PAID_Q12_my_problem_behavior">
-                <button type="button" data-v="press"><span class="opt-indicator"></span><span class="opt-text">몰아붙임</span></button>
-                <button type="button" data-v="avoid"><span class="opt-indicator"></span><span class="opt-text">회피</span></button>
-                <button type="button" data-v="explode"><span class="opt-indicator"></span><span class="opt-text">감정 폭발</span></button>
-                <button type="button" data-v="test"><span class="opt-indicator"></span><span class="opt-text">떠보기 / 반응 확인</span></button>
-                <button type="button" data-v="lie_hide"><span class="opt-indicator"></span><span class="opt-text">숨김 / 거짓말</span></button>
-                <button type="button" data-v="jealous"><span class="opt-indicator"></span><span class="opt-text">의심 / 질투 / 통제</span></button>
-                <button type="button" data-v="neglect"><span class="opt-indicator"></span><span class="opt-text">무심함 / 방치</span></button>
-                <button type="button" data-v="none_clear"><span class="opt-indicator"></span><span class="opt-text">딱히 떠오르지 않음</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="12">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q12</span>
+                  <span class="rl-q-category">내 문제 행동</span>
+                </div>
+                <p class="rl-q-title">내가 반복적으로 했던 문제 행동이 있다면 무엇에 가장 가까웠나요?</p>
+                <div class="rl-options single" data-q="PAID_Q12_my_problem_behavior">
+                  <button type="button" data-v="press"><span class="opt-indicator"></span><span class="opt-text">몰아붙임</span></button>
+                  <button type="button" data-v="avoid"><span class="opt-indicator"></span><span class="opt-text">회피</span></button>
+                  <button type="button" data-v="explode"><span class="opt-indicator"></span><span class="opt-text">감정 폭발</span></button>
+                  <button type="button" data-v="test"><span class="opt-indicator"></span><span class="opt-text">떠보기 / 반응 확인</span></button>
+                  <button type="button" data-v="lie_hide"><span class="opt-indicator"></span><span class="opt-text">숨김 / 거짓말</span></button>
+                  <button type="button" data-v="jealous"><span class="opt-indicator"></span><span class="opt-text">의심 / 질투 / 통제</span></button>
+                  <button type="button" data-v="neglect"><span class="opt-indicator"></span><span class="opt-text">무심함 / 방치</span></button>
+                  <button type="button" data-v="none_clear"><span class="opt-indicator"></span><span class="opt-text">딱히 떠오르지 않음</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="13">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q13</span>
-                <span class="rl-q-category">연락 채널</span>
-              </div>
-              <p class="rl-q-title">현재 연락 채널 상태는 어떤가요?</p>
-              <div class="rl-options single" data-q="PAID_Q13_channel_state">
-                <button type="button" data-v="all_blocked"><span class="opt-indicator"></span><span class="opt-text">전부 차단</span></button>
-                <button type="button" data-v="no_reply"><span class="opt-indicator"></span><span class="opt-text">읽거나 전달은 되지만 답이 없음</span></button>
-                <button type="button" data-v="partial_open"><span class="opt-indicator"></span><span class="opt-text">일부 채널만 열려 있음</span></button>
-                <button type="button" data-v="normal"><span class="opt-indicator"></span><span class="opt-text">연락은 가능</span></button>
-                <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠음</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="13">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q13</span>
+                  <span class="rl-q-category">연락 채널</span>
+                </div>
+                <p class="rl-q-title">현재 연락 채널 상태는 어떤가요?</p>
+                <div class="rl-options single" data-q="PAID_Q13_channel_state">
+                  <button type="button" data-v="all_blocked"><span class="opt-indicator"></span><span class="opt-text">전부 차단</span></button>
+                  <button type="button" data-v="no_reply"><span class="opt-indicator"></span><span class="opt-text">읽거나 전달은 되지만 답이 없음</span></button>
+                  <button type="button" data-v="partial_open"><span class="opt-indicator"></span><span class="opt-text">일부 채널만 열려 있음</span></button>
+                  <button type="button" data-v="normal"><span class="opt-indicator"></span><span class="opt-text">연락은 가능</span></button>
+                  <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠음</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="14">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q14</span>
-                <span class="rl-q-category">상대 신호</span>
-              </div>
-              <p class="rl-q-title">최근 상대에게서 느낀 신호가 있다면 무엇에 가까웠나요?</p>
-              <div class="rl-options single" data-q="PAID_Q14_recent_signal">
-                <button type="button" data-v="none"><span class="opt-indicator"></span><span class="opt-text">아무 신호도 없다</span></button>
-                <button type="button" data-v="neutral_open"><span class="opt-indicator"></span><span class="opt-text">완전 차단은 아니지만 특별한 반응도 없다</span></button>
-                <button type="button" data-v="small_response"><span class="opt-indicator"></span><span class="opt-text">짧게라도 반응한 적 있다</span></button>
-                <button type="button" data-v="indirect_signal"><span class="opt-indicator"></span><span class="opt-text">SNS / 지인 / 간접 신호가 있었다</span></button>
-                <button type="button" data-v="mixed_signal"><span class="opt-indicator"></span><span class="opt-text">애매한 신호가 반복된다</span></button>
-                <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="14">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q14</span>
+                  <span class="rl-q-category">상대 신호</span>
+                </div>
+                <p class="rl-q-title">최근 상대에게서 느낀 신호가 있다면 무엇에 가까웠나요?</p>
+                <div class="rl-options single" data-q="PAID_Q14_recent_signal">
+                  <button type="button" data-v="none"><span class="opt-indicator"></span><span class="opt-text">아무 신호도 없다</span></button>
+                  <button type="button" data-v="neutral_open"><span class="opt-indicator"></span><span class="opt-text">완전 차단은 아니지만 특별한 반응도 없다</span></button>
+                  <button type="button" data-v="small_response"><span class="opt-indicator"></span><span class="opt-text">짧게라도 반응한 적 있다</span></button>
+                  <button type="button" data-v="indirect_signal"><span class="opt-indicator"></span><span class="opt-text">SNS / 지인 / 간접 신호가 있었다</span></button>
+                  <button type="button" data-v="mixed_signal"><span class="opt-indicator"></span><span class="opt-text">애매한 신호가 반복된다</span></button>
+                  <button type="button" data-v="unknown"><span class="opt-indicator"></span><span class="opt-text">잘 모르겠다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="15">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q15</span>
-                <span class="rl-q-category">재접촉 이력</span>
-              </div>
-              <p class="rl-q-title">상대가 거절하거나 멀어진 뒤 다시 접촉을 시도한 적이 있나요?</p>
-              <div class="rl-options single" data-q="PAID_Q15_contact_after_reject">
-                <button type="button" data-v="no"><span class="opt-indicator"></span><span class="opt-text">없다</span></button>
-                <button type="button" data-v="once_twice"><span class="opt-indicator"></span><span class="opt-text">1~2번 있다</span></button>
-                <button type="button" data-v="repeated"><span class="opt-indicator"></span><span class="opt-text">여러 번 있다</span></button>
-                <button type="button" data-v="bypass"><span class="opt-indicator"></span><span class="opt-text">우회해서라도 했다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="15">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q15</span>
+                  <span class="rl-q-category">재접촉 이력</span>
+                </div>
+                <p class="rl-q-title">상대가 거절하거나 멀어진 뒤 다시 접촉을 시도한 적이 있나요?</p>
+                <div class="rl-options single" data-q="PAID_Q15_contact_after_reject">
+                  <button type="button" data-v="no"><span class="opt-indicator"></span><span class="opt-text">없다</span></button>
+                  <button type="button" data-v="once_twice"><span class="opt-indicator"></span><span class="opt-text">1~2번 있다</span></button>
+                  <button type="button" data-v="repeated"><span class="opt-indicator"></span><span class="opt-text">여러 번 있다</span></button>
+                  <button type="button" data-v="bypass"><span class="opt-indicator"></span><span class="opt-text">우회해서라도 했다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="16">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q16</span>
-                <span class="rl-q-category">재접촉 반응</span>
-              </div>
-              <p class="rl-q-title">재접촉 후 상대 반응은 어땠나요?</p>
-              <div class="rl-options single" data-q="PAID_Q16_response_after_contact">
-                <button type="button" data-v="ignored"><span class="opt-indicator"></span><span class="opt-text">무응답이었다</span></button>
-                <button type="button" data-v="cold_reject"><span class="opt-indicator"></span><span class="opt-text">차갑게 거절했다</span></button>
-                <button type="button" data-v="polite_distance"><span class="opt-indicator"></span><span class="opt-text">예의는 있으나 거리감이 있었다</span></button>
-                <button type="button" data-v="mixed"><span class="opt-indicator"></span><span class="opt-text">반응은 있었지만 애매했다</span></button>
-                <button type="button" data-v="soft_open"><span class="opt-indicator"></span><span class="opt-text">완전히 닫힌 느낌은 아니었다</span></button>
-                <button type="button" data-v="no_contact"><span class="opt-indicator"></span><span class="opt-text">아직 재접촉한 적 없다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="16">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q16</span>
+                  <span class="rl-q-category">재접촉 반응</span>
+                </div>
+                <p class="rl-q-title">재접촉 후 상대 반응은 어땠나요?</p>
+                <div class="rl-options single" data-q="PAID_Q16_response_after_contact">
+                  <button type="button" data-v="ignored"><span class="opt-indicator"></span><span class="opt-text">무응답이었다</span></button>
+                  <button type="button" data-v="cold_reject"><span class="opt-indicator"></span><span class="opt-text">차갑게 거절했다</span></button>
+                  <button type="button" data-v="polite_distance"><span class="opt-indicator"></span><span class="opt-text">예의는 있으나 거리감이 있었다</span></button>
+                  <button type="button" data-v="mixed"><span class="opt-indicator"></span><span class="opt-text">반응은 있었지만 애매했다</span></button>
+                  <button type="button" data-v="soft_open"><span class="opt-indicator"></span><span class="opt-text">완전히 닫힌 느낌은 아니었다</span></button>
+                  <button type="button" data-v="no_contact"><span class="opt-indicator"></span><span class="opt-text">아직 재접촉한 적 없다</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="17">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q17</span>
-                <span class="rl-q-category">정서 매몰도</span>
-              </div>
-              <p class="rl-q-title">후회나 미련이 드는 빈도는 어느 정도인가요?</p>
-              <div class="rl-options single" data-q="PAID_Q17_regret_freq">
-                <button type="button" data-v="lt20"><span class="opt-indicator"></span><span class="opt-text">거의 없음</span></button>
-                <button type="button" data-v="m20_50"><span class="opt-indicator"></span><span class="opt-text">가끔</span></button>
-                <button type="button" data-v="m50_70"><span class="opt-indicator"></span><span class="opt-text">자주</span></button>
-                <button type="button" data-v="m70_90"><span class="opt-indicator"></span><span class="opt-text">매우 자주</span></button>
-                <button type="button" data-v="gt90"><span class="opt-indicator"></span><span class="opt-text">거의 계속</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="17">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q17</span>
+                  <span class="rl-q-category">정서 매몰도</span>
+                </div>
+                <p class="rl-q-title">후회나 미련이 드는 빈도는 어느 정도인가요?</p>
+                <div class="rl-options single" data-q="PAID_Q17_regret_freq">
+                  <button type="button" data-v="lt20"><span class="opt-indicator"></span><span class="opt-text">거의 없음</span></button>
+                  <button type="button" data-v="m20_50"><span class="opt-indicator"></span><span class="opt-text">가끔</span></button>
+                  <button type="button" data-v="m50_70"><span class="opt-indicator"></span><span class="opt-text">자주</span></button>
+                  <button type="button" data-v="m70_90"><span class="opt-indicator"></span><span class="opt-text">매우 자주</span></button>
+                  <button type="button" data-v="gt90"><span class="opt-indicator"></span><span class="opt-text">거의 계속</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="18">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q18</span>
-                <span class="rl-q-category">충동 행동</span>
-              </div>
-              <p class="rl-q-title">이별 후 반복적으로 하게 되는 충동 행동이 있다면 무엇인가요?</p>
-              <p class="rl-q-desc">해당되는 항목을 모두 선택해 주세요</p>
-              <div class="rl-options multi" data-q="PAID_Q18_impulse_action" data-none="none">
-                <button type="button" data-v="sns_stalk"><span class="opt-indicator"></span><span class="opt-text">SNS 반복 확인</span></button>
-                <button type="button" data-v="contact"><span class="opt-indicator"></span><span class="opt-text">연락 시도</span></button>
-                <button type="button" data-v="write_delete"><span class="opt-indicator"></span><span class="opt-text">메시지 썼다 지우기</span></button>
-                <button type="button" data-v="call_repeat"><span class="opt-indicator"></span><span class="opt-text">전화 반복</span></button>
-                <button type="button" data-v="check_last_seen"><span class="opt-indicator"></span><span class="opt-text">접속 / 읽음 반복 확인</span></button>
-                <button type="button" data-v="photo_review"><span class="opt-indicator"></span><span class="opt-text">사진 / 대화 반복 보기</span></button>
-                <button type="button" data-v="none" class="is-none"><span class="opt-indicator opt-indicator--none"></span><span class="opt-text">해당 없음</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="18">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q18</span>
+                  <span class="rl-q-category">충동 행동</span>
+                </div>
+                <p class="rl-q-title">이별 후 반복적으로 하게 되는 충동 행동이 있다면 무엇인가요?</p>
+                <p class="rl-q-desc">해당되는 항목을 모두 선택해 주세요</p>
+                <div class="rl-options multi" data-q="PAID_Q18_impulse_action" data-none="none">
+                  <button type="button" data-v="sns_stalk"><span class="opt-indicator"></span><span class="opt-text">SNS 반복 확인</span></button>
+                  <button type="button" data-v="contact"><span class="opt-indicator"></span><span class="opt-text">연락 시도</span></button>
+                  <button type="button" data-v="write_delete"><span class="opt-indicator"></span><span class="opt-text">메시지 썼다 지우기</span></button>
+                  <button type="button" data-v="call_repeat"><span class="opt-indicator"></span><span class="opt-text">전화 반복</span></button>
+                  <button type="button" data-v="check_last_seen"><span class="opt-indicator"></span><span class="opt-text">접속 / 읽음 반복 확인</span></button>
+                  <button type="button" data-v="photo_review"><span class="opt-indicator"></span><span class="opt-text">사진 / 대화 반복 보기</span></button>
+                  <button type="button" data-v="none" class="is-none"><span class="opt-indicator opt-indicator--none"></span><span class="opt-text">해당 없음</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="19">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q19</span>
-                <span class="rl-q-category">최근 2주 변화</span>
-              </div>
-              <p class="rl-q-title">최근 2주 사이 아래 변화가 있었나요?</p>
-              <p class="rl-q-desc">해당되는 항목을 모두 선택해 주세요</p>
-              <div class="rl-options multi" data-q="PAID_Q19_changes_2w" data-none="none">
-                <button type="button" data-v="sleep_appetite"><span class="opt-indicator"></span><span class="opt-text">수면 / 식욕 변화</span></button>
-                <button type="button" data-v="focus_down"><span class="opt-indicator"></span><span class="opt-text">집중력 저하</span></button>
-                <button type="button" data-v="work_drop"><span class="opt-indicator"></span><span class="opt-text">일상 수행 저하</span></button>
-                <button type="button" data-v="mood_swing"><span class="opt-indicator"></span><span class="opt-text">감정 기복 심화</span></button>
-                <button type="button" data-v="social_cut"><span class="opt-indicator"></span><span class="opt-text">사람 피함</span></button>
-                <button type="button" data-v="none" class="is-none"><span class="opt-indicator opt-indicator--none"></span><span class="opt-text">해당 없음</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="19">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q19</span>
+                  <span class="rl-q-category">최근 2주 변화</span>
+                </div>
+                <p class="rl-q-title">최근 2주 사이 아래 변화가 있었나요?</p>
+                <p class="rl-q-desc">해당되는 항목을 모두 선택해 주세요</p>
+                <div class="rl-options multi" data-q="PAID_Q19_changes_2w" data-none="none">
+                  <button type="button" data-v="sleep_appetite"><span class="opt-indicator"></span><span class="opt-text">수면 / 식욕 변화</span></button>
+                  <button type="button" data-v="focus_down"><span class="opt-indicator"></span><span class="opt-text">집중력 저하</span></button>
+                  <button type="button" data-v="work_drop"><span class="opt-indicator"></span><span class="opt-text">일상 수행 저하</span></button>
+                  <button type="button" data-v="mood_swing"><span class="opt-indicator"></span><span class="opt-text">감정 기복 심화</span></button>
+                  <button type="button" data-v="social_cut"><span class="opt-indicator"></span><span class="opt-text">사람 피함</span></button>
+                  <button type="button" data-v="none" class="is-none"><span class="opt-indicator opt-indicator--none"></span><span class="opt-text">해당 없음</span></button>
+                </div>
+              </section>
 
-            <section class="rl-step" data-step="20">
-              <div class="rl-q-header">
-                <span class="rl-q-num">Q20</span>
-                <span class="rl-q-category">원하는 결과</span>
-              </div>
-              <p class="rl-q-title">지금 가장 원하는 결과는 무엇인가요?</p>
-              <div class="rl-options single" data-q="PAID_Q20_goal">
-                <button type="button" data-v="reconnect"><span class="opt-indicator"></span><span class="opt-text">다시 연락이 닿았으면 좋겠다</span></button>
-                <button type="button" data-v="reconcile"><span class="opt-indicator"></span><span class="opt-text">재회를 진지하게 원한다</span></button>
-                <button type="button" data-v="closure"><span class="opt-indicator"></span><span class="opt-text">상대 마음을 알고 정리하고 싶다</span></button>
-                <button type="button" data-v="stabilize"><span class="opt-indicator"></span><span class="opt-text">내 감정을 먼저 안정시키고 싶다</span></button>
-                <button type="button" data-v="unsure"><span class="opt-indicator"></span><span class="opt-text">나도 잘 모르겠다</span></button>
-              </div>
-            </section>
+              <section class="rl-step" data-step="20">
+                <div class="rl-q-header">
+                  <span class="rl-q-num">Q20</span>
+                  <span class="rl-q-category">원하는 결과</span>
+                </div>
+                <p class="rl-q-title">지금 가장 원하는 결과는 무엇인가요?</p>
+                <div class="rl-options single" data-q="PAID_Q20_goal">
+                  <button type="button" data-v="reconnect"><span class="opt-indicator"></span><span class="opt-text">다시 연락이 닿았으면 좋겠다</span></button>
+                  <button type="button" data-v="reconcile"><span class="opt-indicator"></span><span class="opt-text">재회를 진지하게 원한다</span></button>
+                  <button type="button" data-v="closure"><span class="opt-indicator"></span><span class="opt-text">상대 마음을 알고 정리하고 싶다</span></button>
+                  <button type="button" data-v="stabilize"><span class="opt-indicator"></span><span class="opt-text">내 감정을 먼저 안정시키고 싶다</span></button>
+                  <button type="button" data-v="unsure"><span class="opt-indicator"></span><span class="opt-text">나도 잘 모르겠다</span></button>
+                </div>
+              </section>
 
+            </div>
+          </div>
+
+          <p id="paid-msg" class="rl-msg"></p>
+
+          <div class="rl-actions">
+            <button type="button" id="rl-prev" class="rl-btn rl-btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <polyline points="15,18 9,12 15,6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              이전
+            </button>
+            <button type="button" id="rl-next" class="rl-btn rl-btn-primary">
+              다음
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <polyline points="9,18 15,12 9,6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
           </div>
         </div>
 
-        <p id="paid-msg" class="rl-msg"></p>
-
-        <div class="rl-actions">
-          <button type="button" id="rl-prev" class="rl-btn rl-btn-secondary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <polyline points="15,18 9,12 15,6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            이전
-          </button>
-          <button type="button" id="rl-next" class="rl-btn rl-btn-primary">
-            다음
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <polyline points="9,18 15,12 9,6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
       </div>
-
     </div>
   </div>
 </div>
@@ -526,6 +536,46 @@
   width: 400px; height: 300px;
   background: radial-gradient(ellipse, #2A4A90 0%, transparent 70%);
   opacity: 0.1;
+}
+
+/* ACCESS LOADING */
+#rl-paid-page .rl-access-box {
+  position: relative;
+  z-index: 2;
+  max-width: 420px;
+  margin: 120px auto 40px;
+  padding: 28px 22px;
+  border-radius: 20px;
+  background: rgba(14, 22, 42, 0.94);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  text-align: center;
+}
+#rl-paid-page .rl-access-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  border: 3px solid rgba(255,255,255,0.12);
+  border-top-color: #D4916C;
+  animation: rl-access-spin .9s linear infinite;
+}
+#rl-paid-page .rl-access-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: #F7F4EE;
+}
+#rl-paid-page .rl-access-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #8FA4C8;
+}
+@keyframes rl-access-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* CONTAINER */
@@ -993,6 +1043,11 @@
   #rcl-nav .logo { font-size: 16px !important; }
   #rcl-nav .sns-btn { width: 28px !important; height: 28px !important; }
 
+  #rl-paid-page .rl-access-box {
+    margin: 100px 14px 24px;
+    padding: 24px 18px;
+  }
+
   #rl-paid {
     padding: 22px 14px 52px;
   }
@@ -1070,26 +1125,18 @@
 <script>
 (function () {
   const API_BASE = "https://relationship-safe-guide-api.onrender.com";
+  const ACCESS_CHECK_ENDPOINT = API_BASE + "/api/premium/access-check";
   const PAID_ENDPOINT = API_BASE + "/api/survey/paid";
   const TOTAL_STEPS = 20;
+
   let currentStep = 1;
+  let REPORT_TOKEN = "";
+  let ORDER_ID = "";
 
   const urlParams = new URLSearchParams(window.location.search);
 
-  function getReportToken() {
-    const queryToken = urlParams.get("token");
-    if (queryToken) return queryToken;
-
-    const pathMatch = window.location.pathname.match(/\/r\/([^/?#]+)/);
-    if (pathMatch && pathMatch[1]) return pathMatch[1];
-
-    const storageToken = localStorage.getItem("rl_report_token");
-    if (storageToken) return storageToken;
-
-    return "";
-  }
-
-  const REPORT_TOKEN = getReportToken();
+  const accessLoadingEl = document.getElementById("rl-access-loading");
+  const surveyAppEl = document.getElementById("surveyApp");
 
   const answers = {
     PAID_Q1_duration: null,
@@ -1125,6 +1172,34 @@
   const q7OtherWrap = document.getElementById("rl-q7-other-wrap");
   const q7OtherInput = document.getElementById("rl-q7-other-input");
   const q7OtherCount = document.getElementById("rl-q7-other-count");
+
+  function getReportToken() {
+    const queryToken = urlParams.get("token");
+    if (queryToken) return queryToken;
+
+    const pathMatch = window.location.pathname.match(/\/r\/([^/?#]+)/);
+    if (pathMatch && pathMatch[1]) return pathMatch[1];
+
+    const storageToken = localStorage.getItem("rl_report_token");
+    if (storageToken) return storageToken;
+
+    return "";
+  }
+
+  function getOrderId() {
+    return urlParams.get("orderId") || "";
+  }
+
+  function goHome() {
+    window.location.href = "https://reconnectlab.co.kr";
+  }
+
+  function goPending() {
+    const qs = new URLSearchParams();
+    if (REPORT_TOKEN) qs.set("token", REPORT_TOKEN);
+    if (ORDER_ID) qs.set("orderId", ORDER_ID);
+    window.location.href = "https://reconnectlab.co.kr/payment-pending" + (qs.toString() ? ("?" + qs.toString()) : "");
+  }
 
   function setMsg(text, ok) {
     msgEl.textContent = text || "";
@@ -1307,6 +1382,7 @@
       schema_version: "paid_survey_v2_20q",
       stage: "paid",
       report_token: REPORT_TOKEN,
+      order_id: ORDER_ID,
       answers: Object.assign({}, answers)
     };
 
@@ -1355,46 +1431,103 @@
     }
   }
 
-  prevBtn.addEventListener("click", function () {
-    if (currentStep > 1) {
-      currentStep -= 1;
-      setMsg("");
-      updateUI();
-    }
-  });
-
-  nextBtn.addEventListener("click", async function () {
-    const err = validateStep(currentStep);
-    if (err) {
-      setMsg(err);
-      return;
-    }
-
-    if (currentStep < TOTAL_STEPS) {
-      currentStep += 1;
-      setMsg("");
-      updateUI();
-      return;
-    }
-
-    await submitSurvey();
-  });
-
-  if (q7OtherInput) {
-    q7OtherInput.addEventListener("input", function () {
-      const raw = q7OtherInput.value || "";
-      answers.PAID_Q7_breakup_reason_other_text = raw.trim();
-      if (q7OtherCount) q7OtherCount.textContent = String(raw.length);
-      setMsg("");
+  function bindEvents() {
+    prevBtn.addEventListener("click", function () {
+      if (currentStep > 1) {
+        currentStep -= 1;
+        setMsg("");
+        updateUI();
+      }
     });
+
+    nextBtn.addEventListener("click", async function () {
+      const err = validateStep(currentStep);
+      if (err) {
+        setMsg(err);
+        return;
+      }
+
+      if (currentStep < TOTAL_STEPS) {
+        currentStep += 1;
+        setMsg("");
+        updateUI();
+        return;
+      }
+
+      await submitSurvey();
+    });
+
+    if (q7OtherInput) {
+      q7OtherInput.addEventListener("input", function () {
+        const raw = q7OtherInput.value || "";
+        answers.PAID_Q7_breakup_reason_other_text = raw.trim();
+        if (q7OtherCount) q7OtherCount.textContent = String(raw.length);
+        setMsg("");
+      });
+    }
   }
 
-  bindOptionGroups();
-  syncQ7OtherInput();
-  updateUI();
-
-  if (!REPORT_TOKEN) {
-    setMsg("report token 정보가 없습니다. 무료리포트 페이지에서 다시 진입해 주세요.");
+  function initSurveyUI() {
+    bindOptionGroups();
+    bindEvents();
+    syncQ7OtherInput();
+    updateUI();
   }
+
+  async function checkAccess() {
+    REPORT_TOKEN = getReportToken();
+    ORDER_ID = getOrderId();
+
+    if (!REPORT_TOKEN || !ORDER_ID) {
+      goHome();
+      return false;
+    }
+
+    try {
+      const qs = new URLSearchParams({
+        token: REPORT_TOKEN,
+        orderId: ORDER_ID
+      });
+
+      const res = await fetch(ACCESS_CHECK_ENDPOINT + "?" + qs.toString(), {
+        method: "GET"
+      });
+
+      if (!res.ok) {
+        goHome();
+        return false;
+      }
+
+      const data = await res.json();
+
+      if (data && data.ok === true) {
+        return true;
+      }
+
+      if (data && data.reason === "NOT_PAID") {
+        goPending();
+        return false;
+      }
+
+      goHome();
+      return false;
+    } catch (err) {
+      console.error("access-check error:", err);
+      goHome();
+      return false;
+    }
+  }
+
+  async function boot() {
+    const allowed = await checkAccess();
+    if (!allowed) return;
+
+    if (accessLoadingEl) accessLoadingEl.style.display = "none";
+    if (surveyAppEl) surveyAppEl.style.display = "block";
+
+    initSurveyUI();
+  }
+
+  boot();
 })();
 </script>
