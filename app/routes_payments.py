@@ -5,12 +5,12 @@ import time
 import uuid
 import hashlib
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Form
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, HTTPException, Form, Query, Request
+from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 
 from .db import SessionLocal
@@ -22,6 +22,7 @@ INICIS_MID = (os.getenv("INICIS_MID") or "").strip()
 INICIS_SIGN_KEY = (os.getenv("INICIS_SIGN_KEY") or "").strip()
 SERVICE_BASE_URL = (os.getenv("SERVICE_BASE_URL") or "https://reconnectlab.co.kr").strip().rstrip("/")
 API_BASE_URL = (os.getenv("API_BASE_URL") or "https://relationship-safe-guide-api.onrender.com").strip().rstrip("/")
+PAYMENT_BASE_URL = (os.getenv("PAYMENT_BASE_URL") or API_BASE_URL).rstrip("/")
 
 PREMIUM_PRICE = int(os.getenv("PREMIUM_PRICE") or "29000")
 PREMIUM_GOODNAME = (os.getenv("PREMIUM_GOODNAME") or "리커넥트랩 프리미엄 AI 리포트").strip()
@@ -106,15 +107,17 @@ def find_report_and_sid_by_token(report_token: str):
         db.close()
 
 
-@router.post("/api/payments/inicis/prepare")
-async def inicis_prepare(payload: PreparePaymentIn):
-    if not payload.reportToken.strip():
+def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buyer_tel: str):
+    """
+    주문 생성 + 이니시스 요청 form 데이터 생성 공통 함수
+    """
+    if not report_token.strip():
         raise HTTPException(status_code=400, detail="reportToken is required")
 
     if not INICIS_MID or not INICIS_SIGN_KEY:
         raise HTTPException(status_code=500, detail="INICIS_MID / INICIS_SIGN_KEY가 설정되지 않았습니다.")
 
-    rep, sid = find_report_and_sid_by_token(payload.reportToken.strip())
+    rep, sid = find_report_and_sid_by_token(report_token.strip())
     if not rep or not sid:
         raise HTTPException(status_code=404, detail="유효한 report token을 찾을 수 없습니다.")
 
@@ -135,10 +138,10 @@ async def inicis_prepare(payload: PreparePaymentIn):
             pg_payload_json=json.dumps(
                 {
                     "stage": "prepare",
-                    "report_token": payload.reportToken.strip(),
-                    "buyerName": payload.buyerName or "고객",
-                    "buyerEmail": payload.buyerEmail or "help@reconnectlab.co.kr",
-                    "buyerTel": payload.buyerTel or "010-0000-0000",
+                    "report_token": report_token.strip(),
+                    "buyerName": buyer_name,
+                    "buyerEmail": buyer_email,
+                    "buyerTel": buyer_tel,
                     "created_at": datetime.utcnow().isoformat(),
                 },
                 ensure_ascii=False,
@@ -161,25 +164,164 @@ async def inicis_prepare(payload: PreparePaymentIn):
         "mKey": mkey,
         "currency": "WON",
         "goodname": PREMIUM_GOODNAME,
-        "buyername": payload.buyerName or "고객",
-        "buyeremail": payload.buyerEmail or "help@reconnectlab.co.kr",
-        "buyertel": payload.buyerTel or "010-0000-0000",
-        "returnUrl": f"{SERVICE_BASE_URL}/api/payments/inicis/return",
-        "closeUrl": f"{SERVICE_BASE_URL}/payment-close",
+        "buyername": buyer_name,
+        "buyeremail": buyer_email,
+        "buyertel": buyer_tel,
+        "returnUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/return",
+        "closeUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/close",
         "charset": "UTF-8",
         "format": "JSON",
         "payViewType": "overlay",
-        "merchantData": payload.reportToken.strip(),
-        # 디지털콘텐츠 당일 제공 기준 예시
+        "merchantData": report_token.strip(),
         "offerPeriod": datetime.utcnow().strftime("%Y%m%d-%Y%m%d"),
-        "gopaymethod" : "",
-        "acceptmethod" : "centerCd(Y)",
+        "gopaymethod": "",
+        "acceptmethod": "centerCd(Y)",
     }
+    return form
+
+
+def render_inicis_html(form: dict) -> HTMLResponse:
+    inputs = []
+    for key, value in form.items():
+        if value is None:
+            continue
+        safe_key = str(key).replace('"', "&quot;")
+        safe_val = str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+        inputs.append(f'<input type="hidden" name="{safe_key}" value="{safe_val}" />')
+
+    html = f"""
+    <!doctype html>
+    <html lang="ko">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>리커넥트랩 결제 진행</title>
+      <script src="https://stdpay.inicis.com/stdjs/INIStdPay.js" charset="UTF-8"></script>
+      <style>
+        body {{
+          font-family: Arial, sans-serif;
+          background: #0F1626;
+          color: #F0ECE8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          margin: 0;
+          padding: 24px;
+        }}
+        .box {{
+          width: 100%;
+          max-width: 420px;
+          background: #1A2540;
+          border: 1px solid rgba(212,145,108,.2);
+          border-radius: 16px;
+          padding: 28px 24px;
+          text-align: center;
+        }}
+        .spinner {{
+          width: 36px;
+          height: 36px;
+          border: 3px solid rgba(255,255,255,.15);
+          border-top-color: #D4916C;
+          border-radius: 50%;
+          margin: 0 auto 16px;
+          animation: spin 1s linear infinite;
+        }}
+        @keyframes spin {{
+          to {{ transform: rotate(360deg); }}
+        }}
+        .title {{
+          font-size: 18px;
+          font-weight: 700;
+          margin-bottom: 8px;
+        }}
+        .desc {{
+          font-size: 14px;
+          color: #9AAABB;
+          line-height: 1.6;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <div class="spinner"></div>
+        <div class="title">결제창을 준비하고 있어요</div>
+        <div class="desc">잠시만 기다리면 KG이니시스 결제창이 열립니다.</div>
+      </div>
+
+      <form id="inicisPayForm" method="POST" accept-charset="UTF-8" style="display:none;">
+        {''.join(inputs)}
+      </form>
+
+      <script>
+        window.addEventListener("load", function () {{
+          if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
+            alert("결제 모듈을 불러오지 못했습니다.");
+            window.location.href = "{SERVICE_BASE_URL}/payment-fail?code=INICIS_SCRIPT_LOAD_FAIL";
+            return;
+          }}
+          INIStdPay.pay("inicisPayForm");
+        }});
+      </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+@router.get("/pay/start", response_class=HTMLResponse)
+async def pay_start_page(
+    report_token: str = Query(...),
+    buyer_name: str = Query("고객"),
+    buyer_email: str = Query("help@reconnectlab.co.kr"),
+    buyer_tel: str = Query("010-0000-0000"),
+):
+    form = build_inicis_form(
+        report_token=report_token,
+        buyer_name=buyer_name or "고객",
+        buyer_email=buyer_email or "help@reconnectlab.co.kr",
+        buyer_tel=buyer_tel or "010-0000-0000",
+    )
+    return render_inicis_html(form)
+
+
+@router.post("/api/payments/inicis/prepare")
+async def inicis_prepare(payload: PreparePaymentIn):
+    form = build_inicis_form(
+        report_token=payload.reportToken.strip(),
+        buyer_name=payload.buyerName or "고객",
+        buyer_email=payload.buyerEmail or "help@reconnectlab.co.kr",
+        buyer_tel=payload.buyerTel or "010-0000-0000",
+    )
 
     return {
         "ok": True,
         "form": form,
     }
+
+
+@router.api_route("/api/payments/inicis/close", methods=["GET", "POST"], response_class=HTMLResponse)
+async def inicis_close():
+    return HTMLResponse(
+        content=f"""
+        <!doctype html>
+        <html lang="ko">
+        <head>
+          <meta charset="utf-8" />
+          <title>결제 취소</title>
+        </head>
+        <body>
+          <script>
+            if (window.opener && !window.opener.closed) {{
+              window.close();
+            }} else {{
+              window.location.replace("{SERVICE_BASE_URL}/payment-cancel");
+            }}
+          </script>
+        </body>
+        </html>
+        """
+    )
 
 
 @router.post("/api/payments/inicis/return")
@@ -195,10 +337,9 @@ async def inicis_return(
     merchantData: Optional[str] = Form(None),
     idc_name: Optional[str] = Form(None),
 ):
-    # 1) 인증단계 실패
     if resultCode != "0000":
         return RedirectResponse(
-            url=f"{SERVICE_BASE_URL}/payment-fail?code={resultCode or 'AUTH_FAIL'}&msg={resultMsg or ''}",
+            url=f"{SERVICE_BASE_URL}/payment-fail?code={quote(resultCode or 'AUTH_FAIL')}&msg={quote(resultMsg or '')}",
             status_code=303,
         )
 
@@ -222,6 +363,13 @@ async def inicis_return(
                 url=f"{SERVICE_BASE_URL}/payment-fail?code=ORDER_NOT_FOUND",
                 status_code=303,
             )
+
+        # 기존 prepare 데이터 미리 백업
+        prepared_payload = {}
+        try:
+            prepared_payload = json.loads(order.pg_payload_json or "{}")
+        except Exception:
+            prepared_payload = {}
 
         timestamp = str(int(time.time() * 1000))
         signature = make_auth_signature(authToken, timestamp)
@@ -254,6 +402,7 @@ async def inicis_return(
                 {
                     "stage": "approve_http_error",
                     "error": str(e),
+                    "prepared_payload": prepared_payload,
                     "auth_result": {
                         "resultCode": resultCode,
                         "resultMsg": resultMsg,
@@ -269,7 +418,6 @@ async def inicis_return(
             )
             db.commit()
 
-            # 망취소 시도
             if netCancelUrl:
                 try:
                     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -291,6 +439,7 @@ async def inicis_return(
             order.pg_payload_json = json.dumps(
                 {
                     "stage": "approve_failed",
+                    "prepared_payload": prepared_payload,
                     "auth_result": {
                         "resultCode": resultCode,
                         "resultMsg": resultMsg,
@@ -308,17 +457,17 @@ async def inicis_return(
             db.commit()
 
             return RedirectResponse(
-                url=f"{SERVICE_BASE_URL}/payment-fail?code={(approve_data or {}).get('resultCode', 'APPROVE_FAIL')}",
+                url=f"{SERVICE_BASE_URL}/payment-fail?code={quote((approve_data or {}).get('resultCode', 'APPROVE_FAIL'))}",
                 status_code=303,
             )
 
-        # 승인 성공
         order.status = "PAID"
         order.amount = int(approve_data.get("TotPrice") or order.amount or PREMIUM_PRICE)
         order.paid_at = datetime.utcnow()
         order.pg_payload_json = json.dumps(
             {
                 "stage": "paid",
+                "prepared_payload": prepared_payload,
                 "auth_result": {
                     "resultCode": resultCode,
                     "resultMsg": resultMsg,
@@ -335,14 +484,9 @@ async def inicis_return(
         )
         db.commit()
 
-        report_token = merchantData or ""
+        report_token = (merchantData or "").strip()
         if not report_token:
-            # 혹시 merchantData가 비어 있으면 기존 payload에서 복구
-            try:
-                prepared = json.loads(order.pg_payload_json)
-                report_token = prepared.get("report_token", "")
-            except Exception:
-                report_token = ""
+            report_token = (prepared_payload.get("report_token") or "").strip()
 
         if not report_token:
             return RedirectResponse(
@@ -351,7 +495,7 @@ async def inicis_return(
             )
 
         return RedirectResponse(
-            url=f"{SERVICE_BASE_URL}/premium-survey?token={report_token}&orderId={order.order_id}",
+            url=f"{SERVICE_BASE_URL}/premium-survey?token={quote(report_token)}&orderId={quote(order.order_id)}",
             status_code=303,
         )
 
