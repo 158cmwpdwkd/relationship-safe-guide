@@ -165,7 +165,7 @@ async def inicis_prepare(payload: PreparePaymentIn):
         "buyeremail": payload.buyerEmail or "help@reconnectlab.co.kr",
         "buyertel": payload.buyerTel or "010-0000-0000",
         "returnUrl": f"{API_BASE_URL}/api/payments/inicis/return",
-        "closeUrl": f"{SERVICE_BASE_URL}/payment-close",
+        "closeUrl": f"{API_BASE_URL}/payment-close",
         "charset": "UTF-8",
         "format": "JSON",
         "payViewType": "overlay",
