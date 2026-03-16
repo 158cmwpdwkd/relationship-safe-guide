@@ -172,6 +172,8 @@ async def inicis_prepare(payload: PreparePaymentIn):
         "merchantData": payload.reportToken.strip(),
         # 디지털콘텐츠 당일 제공 기준 예시
         "offerPeriod": datetime.utcnow().strftime("%Y%m%d-%Y%m%d"),
+        "gopaymethod" : "",
+        "acceptmethod" : "centerCd(Y)",
     }
 
     return {
