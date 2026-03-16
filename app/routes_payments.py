@@ -10,7 +10,7 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException, Form, Query, Request
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from .db import SessionLocal
@@ -105,6 +105,35 @@ def find_report_and_sid_by_token(report_token: str):
         return rep, rep.sid
     finally:
         db.close()
+
+
+def get_report_token_from_order(order: Order) -> str:
+    try:
+        payload = json.loads(order.pg_payload_json or "{}")
+    except Exception:
+        payload = {}
+
+    if isinstance(payload, dict):
+        # prepare 단계에서 넣어둔 값 우선
+        if payload.get("prepared_payload", {}).get("report_token"):
+            return str(payload["prepared_payload"]["report_token"]).strip()
+        if payload.get("report_token"):
+            return str(payload["report_token"]).strip()
+
+    return ""
+
+
+def get_pay_method(approve_data: dict) -> str:
+    return str(
+        approve_data.get("payMethod")
+        or approve_data.get("gopaymethod")
+        or approve_data.get("paymethod")
+        or ""
+    ).strip().upper()
+
+
+def is_vbank_pay_method(pay_method: str) -> bool:
+    return pay_method in {"VBANK", "VACCT"}
 
 
 def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buyer_tel: str):
@@ -461,6 +490,69 @@ async def inicis_return(
                 status_code=303,
             )
 
+        pay_method = get_pay_method(approve_data)
+
+        report_token = (merchantData or "").strip()
+        if not report_token:
+            report_token = (prepared_payload.get("report_token") or "").strip()
+
+        if not report_token:
+            order.status = "FAILED"
+            order.pg_payload_json = json.dumps(
+                {
+                    "stage": "missing_report_token",
+                    "prepared_payload": prepared_payload,
+                    "auth_result": {
+                        "resultCode": resultCode,
+                        "resultMsg": resultMsg,
+                        "mid": mid,
+                        "orderNumber": orderNumber,
+                        "authUrl": authUrl,
+                        "netCancelUrl": netCancelUrl,
+                        "merchantData": merchantData,
+                        "idc_name": idc_name,
+                    },
+                    "approve_result": approve_data,
+                },
+                ensure_ascii=False,
+            )
+            db.commit()
+
+            return RedirectResponse(
+                url=f"{SERVICE_BASE_URL}/payment-fail?code=MISSING_REPORT_TOKEN",
+                status_code=303,
+            )
+
+        # 가상계좌는 "승인성공"이 아니라 "채번성공"일 수 있음
+        if is_vbank_pay_method(pay_method):
+            order.status = "VBANK_ISSUED"
+            order.amount = int(approve_data.get("TotPrice") or order.amount or PREMIUM_PRICE)
+            order.pg_payload_json = json.dumps(
+                {
+                    "stage": "vbank_issued",
+                    "prepared_payload": prepared_payload,
+                    "auth_result": {
+                        "resultCode": resultCode,
+                        "resultMsg": resultMsg,
+                        "mid": mid,
+                        "orderNumber": orderNumber,
+                        "authUrl": authUrl,
+                        "netCancelUrl": netCancelUrl,
+                        "merchantData": merchantData,
+                        "idc_name": idc_name,
+                    },
+                    "approve_result": approve_data,
+                },
+                ensure_ascii=False,
+            )
+            db.commit()
+
+            return RedirectResponse(
+                url=f"{SERVICE_BASE_URL}/payment-pending?token={quote(report_token)}&orderId={quote(order.order_id)}",
+                status_code=303,
+            )
+
+        # 카드/즉시결제류만 여기서 PAID 처리
         order.status = "PAID"
         order.amount = int(approve_data.get("TotPrice") or order.amount or PREMIUM_PRICE)
         order.paid_at = datetime.utcnow()
@@ -484,20 +576,100 @@ async def inicis_return(
         )
         db.commit()
 
-        report_token = (merchantData or "").strip()
-        if not report_token:
-            report_token = (prepared_payload.get("report_token") or "").strip()
-
-        if not report_token:
-            return RedirectResponse(
-                url=f"{SERVICE_BASE_URL}/payment-fail?code=MISSING_REPORT_TOKEN",
-                status_code=303,
-            )
-
         return RedirectResponse(
             url=f"{SERVICE_BASE_URL}/premium-survey?token={quote(report_token)}&orderId={quote(order.order_id)}",
             status_code=303,
         )
 
+    finally:
+        db.close()
+
+
+@router.post("/api/payments/inicis/vbank-notify")
+async def inicis_vbank_notify(request: Request):
+    """
+    가상계좌 입금통보 노티
+    - KG이니시스 관리자에서 '입금통보수신URL' 로 이 주소를 등록해야 함
+    - 성공 처리 시 반드시 본문 "OK" 를 반환해야 함
+    """
+    form = await request.form()
+
+    p_oid = (form.get("P_OID") or "").strip()
+    p_status = (form.get("P_STATUS") or "").strip()
+    p_amt = (form.get("P_AMT") or "").strip()
+    p_tid = (form.get("P_TID") or "").strip()
+    p_type = (form.get("P_TYPE") or "").strip()
+    p_auth_dt = (form.get("P_AUTH_DT") or "").strip()
+    p_rmesg1 = (form.get("P_RMESG1") or "").strip()
+    p_rmesg2 = (form.get("P_RMESG2") or "").strip()
+    p_noti = (form.get("P_NOTI") or "").strip()
+    p_uname = (form.get("P_UNAME") or "").strip()
+    p_fn_nm = (form.get("P_FN_NM") or "").strip()
+
+    if not p_oid:
+        return PlainTextResponse("NOT_FOUND", status_code=404)
+
+    db = SessionLocal()
+    try:
+        order = db.query(Order).filter(Order.order_id == p_oid).first()
+        if not order:
+            return PlainTextResponse("NOT_FOUND", status_code=404)
+
+        # 기존 payload 보존
+        try:
+            existing_payload = json.loads(order.pg_payload_json or "{}")
+        except Exception:
+            existing_payload = {}
+
+        notify_data = {
+            "P_OID": p_oid,
+            "P_STATUS": p_status,
+            "P_AMT": p_amt,
+            "P_TID": p_tid,
+            "P_TYPE": p_type,
+            "P_AUTH_DT": p_auth_dt,
+            "P_RMESG1": p_rmesg1,
+            "P_RMESG2": p_rmesg2,
+            "P_NOTI": p_noti,
+            "P_UNAME": p_uname,
+            "P_FN_NM": p_fn_nm,
+            "received_at": datetime.utcnow().isoformat(),
+        }
+
+        # 00 = 채번, 02 = 입금통보
+        if p_status == "02":
+            order.status = "PAID"
+            if p_amt:
+                try:
+                    order.amount = int(p_amt)
+                except Exception:
+                    pass
+            order.paid_at = datetime.utcnow()
+            order.pg_payload_json = json.dumps(
+                {
+                    "stage": "vbank_paid",
+                    "previous_payload": existing_payload,
+                    "notify_result": notify_data,
+                },
+                ensure_ascii=False,
+            )
+            db.commit()
+            return PlainTextResponse("OK", status_code=200)
+
+        # 채번/기타 상태도 로그는 남김
+        order.pg_payload_json = json.dumps(
+            {
+                "stage": "vbank_notify_received",
+                "previous_payload": existing_payload,
+                "notify_result": notify_data,
+            },
+            ensure_ascii=False,
+        )
+        db.commit()
+        return PlainTextResponse("OK", status_code=200)
+
+    except Exception:
+        db.rollback()
+        return PlainTextResponse("FAIL", status_code=500)
     finally:
         db.close()
