@@ -1,0 +1,1113 @@
+<!-- =====================================================
+  리커넥트랩 랜딩페이지 v2 (정리본)
+  - 아임웹 HTML 위젯 전용 (html/head/body 없음)
+  - 모바일 SNS 아이콘 "숨김" 규칙 제거 + 모바일 네비 고정 레이아웃 1개로 통합
+  ===================================================== -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+<style>
+  /* ── 아임웹 충돌 방지: 기본 리셋 ── */
+  #rcl, #rcl * { box-sizing: border-box !important; }
+  #rcl a { text-decoration: none !important; color: inherit !important; }
+  #rcl img { max-width: 100% !important; display: block !important; }
+
+  /* 전체 래퍼 */
+  #rcl{
+    font-family:'Noto Sans KR',sans-serif !important;
+    font-size:16px !important;
+    line-height:1.75 !important;
+    color:#F0ECE8 !important;
+    background:#0F1626 !important;
+    overflow-x:hidden !important;
+
+    /* 아임웹 위젯 컨테이너 탈출 - 좌우 여백 제거 */
+    width:100vw !important;
+    position:relative !important;
+    left:50% !important;
+    transform:translateX(-50%) !important;
+    margin:0 !important;
+    padding:0 !important;
+  }
+
+  /* ── 스크롤 페이드 ── */
+  #rcl .fade{
+    opacity:1 !important;
+    transform:none !important;
+    transition:opacity .65s ease, transform .65s ease;
+  }
+  #rcl .fade.will-animate{ opacity:0 !important; transform:translateY(28px) !important; }
+  #rcl .fade.will-animate.visible,
+  #rcl .fade.visible{ opacity:1 !important; transform:none !important; }
+
+  #rcl .fd1{ transition-delay:.1s; }
+  #rcl .fd2{ transition-delay:.2s; }
+  #rcl .fd3{ transition-delay:.3s; }
+  #rcl .fd4{ transition-delay:.4s; }
+
+  /* ── 레이아웃 ── */
+  #rcl .wrap{ max-width:680px !important; margin:0 auto !important; padding:0 20px !important; }
+  #rcl .sec{ padding:72px 0 !important; }
+
+  /* ── 공통 ── */
+  #rcl .tag{
+    display:inline-block !important;
+    font-size:11px !important;
+    font-weight:700 !important;
+    letter-spacing:.12em !important;
+    text-transform:uppercase !important;
+    color:#D4916C !important;
+    border:1px solid rgba(212,145,108,.25) !important;
+    border-radius:100px !important;
+    padding:4px 14px !important;
+    margin-bottom:18px !important;
+  }
+  #rcl .sec-title{
+    font-size:clamp(22px,5vw,30px) !important;
+    font-weight:700 !important;
+    line-height:1.4 !important;
+    color:#F0ECE8 !important;
+    margin-bottom:10px !important;
+    word-break:keep-all !important;
+  }
+  #rcl .sec-sub{
+    font-size:15px !important;
+    color:#9AAABB !important;
+    line-height:1.7 !important;
+    margin-bottom:36px !important;
+    word-break:keep-all !important;
+  }
+
+  /* ── 버튼 ── */
+  #rcl .btn-p{
+    display:inline-block !important;
+    background:linear-gradient(135deg,#D4916C,#BE7D5A) !important;
+    color:#fff !important;
+    font-weight:700 !important;
+    font-size:15px !important;
+    padding:15px 32px !important;
+    border-radius:50px !important;
+    border:none !important;
+    cursor:pointer !important;
+    box-shadow:0 4px 20px rgba(212,145,108,.38) !important;
+    transition:transform .2s, box-shadow .2s !important;
+  }
+  #rcl .btn-p:hover{ transform:translateY(-2px) !important; box-shadow:0 8px 28px rgba(212,145,108,.5) !important; }
+
+  #rcl .btn-s{
+    display:inline-block !important;
+    background:transparent !important;
+    color:#9AAABB !important;
+    font-size:14px !important;
+    padding:15px 24px !important;
+    border-radius:50px !important;
+    border:1px solid rgba(154,170,187,.3) !important;
+    cursor:pointer !important;
+    transition:color .2s, border-color .2s !important;
+  }
+  #rcl .btn-s:hover{ color:#F0ECE8 !important; border-color:#9AAABB !important; }
+
+  /* ════════════════════════════
+     NAV
+     ════════════════════════════ */
+  #rcl-nav{
+    position:fixed !important;
+    top:0 !important;
+    left:0 !important;
+    width:100% !important;
+    z-index:9990 !important;
+    padding:14px 20px !important;
+    background:rgba(15,22,38,.9) !important;
+    backdrop-filter:blur(10px) !important;
+    border-bottom:1px solid rgba(212,145,108,.15) !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:12px !important;
+  }
+  #rcl-nav .nav-left{
+    display:flex !important;
+    align-items:center !important;
+    gap:14px !important;
+    min-width:0 !important;
+    flex:1 1 auto !important;
+  }
+  #rcl-nav .logo{
+    font-size:18px !important;
+    font-weight:700 !important;
+    color:#F0ECE8 !important;
+    letter-spacing:-.02em !important;
+    white-space:nowrap !important;
+  }
+  #rcl-nav .logo span{ color:#D4916C !important; }
+
+  #rcl-nav .sns-links{
+    display:flex !important;
+    gap:6px !important;
+    align-items:center !important;
+    flex-shrink:0 !important;
+  }
+  #rcl-nav .sns-btn{
+    width:32px !important;
+    height:32px !important;
+    border-radius:50% !important;
+    background:rgba(255,255,255,.08) !important;
+    border:1px solid rgba(255,255,255,.12) !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    cursor:pointer !important;
+    transition:background .2s, border-color .2s !important;
+    color:#F0ECE8 !important;
+  }
+  #rcl-nav .sns-btn:hover{
+    background:rgba(212,145,108,.25) !important;
+    border-color:rgba(212,145,108,.4) !important;
+  }
+  #rcl-nav .sns-btn svg,
+  #rcl-nav .sns-btn svg path{ width:15px !important; height:15px !important; fill:#F0ECE8 !important; }
+
+  #rcl-nav .nav-cta{
+    background:#D4916C !important;
+    color:#fff !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    padding:8px 18px !important;
+    border-radius:50px !important;
+    border:none !important;
+    cursor:pointer !important;
+    transition:opacity .2s !important;
+    white-space:nowrap !important;
+    flex-shrink:0 !important;
+  }
+  #rcl-nav .nav-cta:hover{ opacity:.85 !important; }
+
+  /* ════════════════════════════
+     FLOATING CTA → 카카오톡
+     ════════════════════════════ */
+  #rcl-float{
+    position:fixed !important;
+    bottom:22px !important;
+    right:18px !important;
+    z-index:9999 !important;
+    display:flex !important;
+    align-items:center !important;
+    gap:7px !important;
+    background:#FAE100 !important;
+    color:#391B1B !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    padding:12px 18px !important;
+    border-radius:50px !important;
+    box-shadow:0 6px 24px rgba(250,225,0,.4) !important;
+    cursor:pointer !important;
+    border:none !important;
+    text-decoration:none !important;
+    animation:kakao-pulse 2.8s infinite !important;
+    transition:transform .2s !important;
+  }
+  #rcl-float:hover{ transform:scale(1.05) !important; }
+  @keyframes kakao-pulse{
+    0%,100%{ box-shadow:0 6px 24px rgba(250,225,0,.4); }
+    50%{ box-shadow:0 8px 32px rgba(250,225,0,.65); }
+  }
+  #rcl-float .kakao-icon{ width:20px !important; height:20px !important; min-width:20px !important; }
+
+  /* ════════════════════════════
+     § 1 HERO
+     ════════════════════════════ */
+  #rcl .hero{
+    min-height:100vh !important;
+    display:flex !important;
+    align-items:center !important;
+    padding:100px 0 80px !important;
+    position:relative !important;
+    overflow:hidden !important;
+    background:#0F1626 !important;
+  }
+  #rcl .hero::before{
+    content:'' !important;
+    position:absolute !important;
+    top:-100px !important; right:-100px !important;
+    width:460px !important; height:460px !important;
+    background:radial-gradient(circle, rgba(212,145,108,.13) 0%, transparent 70%) !important;
+    pointer-events:none !important;
+  }
+  #rcl .hero::after{
+    content:'' !important;
+    position:absolute !important;
+    bottom:-60px !important; left:-60px !important;
+    width:380px !important; height:380px !important;
+    background:radial-gradient(circle, rgba(78,205,196,.07) 0%, transparent 70%) !important;
+    pointer-events:none !important;
+  }
+  #rcl .hero-kicker{
+    font-size:12px !important;
+    font-weight:700 !important;
+    letter-spacing:.16em !important;
+    text-transform:uppercase !important;
+    color:#D4916C !important;
+    margin-bottom:18px !important;
+  }
+  #rcl .hero-title{
+    font-size:clamp(28px,7vw,44px) !important;
+    font-weight:700 !important;
+    line-height:1.3 !important;
+    color:#F0ECE8 !important;
+    margin-bottom:18px !important;
+    word-break:keep-all !important;
+  }
+  #rcl .hero-title em{
+    font-style:normal !important;
+    color:#EAB89A !important;
+    position:relative !important;
+  }
+  #rcl .hero-title em::after{
+    content:'' !important;
+    position:absolute !important;
+    left:0 !important; bottom:2px !important;
+    width:100% !important; height:2px !important;
+    background:#D4916C !important;
+    border-radius:2px !important;
+  }
+  #rcl .hero-sub{
+    font-size:16px !important;
+    color:#9AAABB !important;
+    line-height:1.75 !important;
+    margin-bottom:34px !important;
+    word-break:keep-all !important;
+    max-width:460px !important;
+  }
+  #rcl .hero-btns{ display:flex !important; gap:12px !important; flex-wrap:wrap !important; }
+  #rcl .hero-badges{ margin-top:34px !important; display:flex !important; gap:24px !important; flex-wrap:wrap !important; }
+  #rcl .badge-item{ display:flex !important; align-items:center !important; gap:8px !important; font-size:13px !important; color:#9AAABB !important; }
+  #rcl .badge-icon{
+    width:30px !important; height:30px !important;
+    border-radius:50% !important;
+    background:#1A2540 !important;
+    border:1px solid rgba(212,145,108,.2) !important;
+    display:flex !important; align-items:center !important; justify-content:center !important;
+    font-size:14px !important;
+  }
+
+  /* ════════════════════════════
+     § 2 EMPATHY
+     ════════════════════════════ */
+  #rcl .empathy{ background:#1A2540 !important; }
+  #rcl .checklist{ display:flex !important; flex-direction:column !important; gap:12px !important; }
+  #rcl .check-item{
+    display:flex !important;
+    align-items:center !important;
+    gap:14px !important;
+    background:#222E4A !important;
+    border:1px solid rgba(212,145,108,.18) !important;
+    border-radius:14px !important;
+    padding:16px 20px !important;
+    transition:border-color .3s !important;
+  }
+  #rcl .check-item:hover{ border-color:rgba(212,145,108,.45) !important; }
+  #rcl .check-dot{
+    width:22px !important; height:22px !important; min-width:22px !important;
+    border-radius:50% !important;
+    border:2px solid #D4916C !important;
+    position:relative !important;
+    flex-shrink:0 !important;
+  }
+  #rcl .check-dot::after{
+    content:'' !important;
+    position:absolute !important;
+    top:50% !important; left:50% !important;
+    transform:translate(-50%,-50%) !important;
+    width:8px !important; height:8px !important;
+    border-radius:50% !important;
+    background:#D4916C !important;
+    opacity:.5 !important;
+  }
+  #rcl .check-txt{
+    margin:0 !important;
+    font-size:15px !important;
+    line-height:1.6 !important;
+    color:#F0ECE8 !important;
+    word-break:keep-all !important;
+  }
+  #rcl .bridge{
+    margin-top:26px !important;
+    padding:18px 20px !important;
+    background:linear-gradient(135deg, rgba(212,145,108,.1), rgba(78,205,196,.06)) !important;
+    border-left:3px solid #D4916C !important;
+    border-radius:0 14px 14px 0 !important;
+    font-size:15px !important;
+    color:#F0ECE8 !important;
+    line-height:1.7 !important;
+    word-break:keep-all !important;
+  }
+  #rcl .bridge strong{ color:#EAB89A !important; font-weight:700 !important; }
+
+  /* ════════════════════════════
+     § 3 FACTS
+     ════════════════════════════ */
+  #rcl .facts-sec{ background:#0F1626 !important; }
+  #rcl .fact-grid{ display:flex !important; flex-direction:column !important; gap:14px !important; }
+  #rcl .fact-card{
+    background:#1A2540 !important;
+    border:1px solid rgba(212,145,108,.18) !important;
+    border-radius:14px !important;
+    padding:22px 20px !important;
+    position:relative !important;
+    overflow:hidden !important;
+    transition:transform .25s, box-shadow .25s !important;
+  }
+  #rcl .fact-card:hover{ transform:translateY(-3px) !important; box-shadow:0 8px 28px rgba(0,0,0,.3) !important; }
+  #rcl .fact-card::before{ content:'' !important; position:absolute !important; top:0 !important; left:0 !important; width:4px !important; height:100% !important; }
+  #rcl .fc-warn::before{ background:#FFB347 !important; }
+  #rcl .fc-caution::before{ background:#D4916C !important; }
+  #rcl .fc-info::before{ background:#4ECDC4 !important; }
+  #rcl .fact-num{ font-size:26px !important; font-weight:700 !important; margin-bottom:6px !important; }
+  #rcl .fc-warn .fact-num{ color:#FFB347 !important; }
+  #rcl .fc-caution .fact-num{ color:#D4916C !important; }
+  #rcl .fc-info .fact-num{ color:#4ECDC4 !important; }
+  #rcl .fact-lbl{ font-size:16px !important; font-weight:700 !important; color:#F0ECE8 !important; margin-bottom:8px !important; }
+  #rcl .fact-desc{ font-size:14px !important; color:#9AAABB !important; line-height:1.65 !important; word-break:keep-all !important; }
+
+  /* ════════════════════════════
+     § 4 HOW IT WORKS
+     ════════════════════════════ */
+  #rcl .how-sec{ background:#1A2540 !important; }
+  #rcl .steps{ display:flex !important; flex-direction:column !important; }
+  #rcl .step{
+    display:flex !important;
+    gap:18px !important;
+    align-items:flex-start !important;
+    padding:22px 0 !important;
+    border-bottom:1px solid rgba(212,145,108,.15) !important;
+  }
+  #rcl .step:last-child{ border-bottom:none !important; }
+  #rcl .step-num{
+    width:42px !important; height:42px !important; min-width:42px !important;
+    border-radius:50% !important;
+    background:linear-gradient(135deg,#D4916C,#BE7D5A) !important;
+    color:#fff !important;
+    font-size:18px !important;
+    font-weight:700 !important;
+    display:flex !important; align-items:center !important; justify-content:center !important;
+    box-shadow:0 4px 16px rgba(212,145,108,.35) !important;
+  }
+  #rcl .step-icon{ font-size:20px !important; margin-bottom:4px !important; }
+  #rcl .step-title{ font-size:17px !important; font-weight:700 !important; color:#F0ECE8 !important; margin-bottom:6px !important; }
+  #rcl .step-desc{ font-size:14px !important; color:#9AAABB !important; line-height:1.65 !important; word-break:keep-all !important; }
+
+  /* ════════════════════════════
+     § 5 SAMPLE REPORT
+     ════════════════════════════ */
+  #rcl .sample-sec{ background:#0F1626 !important; }
+  #rcl .report-card{
+    background:#1A2540 !important;
+    border:1px solid rgba(212,145,108,.18) !important;
+    border-radius:18px !important;
+    overflow:hidden !important;
+    position:relative !important;
+  }
+  #rcl .report-hd{
+    background:linear-gradient(135deg,#222E4A, rgba(212,145,108,.1)) !important;
+    padding:18px 22px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    border-bottom:1px solid rgba(212,145,108,.15) !important;
+  }
+  #rcl .report-title-row{ display:flex !important; align-items:center !important; gap:10px !important; }
+  #rcl .rpt-icon{
+    width:36px !important; height:36px !important;
+    border-radius:8px !important;
+    background:linear-gradient(135deg,#D4916C,#C07050) !important;
+    display:flex !important; align-items:center !important; justify-content:center !important;
+    font-size:18px !important;
+  }
+  #rcl .rpt-name{ font-size:15px !important; font-weight:700 !important; color:#F0ECE8 !important; }
+  #rcl .rpt-date{ font-size:12px !important; color:#9AAABB !important; }
+  #rcl .rpt-badge{
+    font-size:11px !important;
+    font-weight:700 !important;
+    background:rgba(212,145,108,.15) !important;
+    color:#EAB89A !important;
+    border:1px solid rgba(212,145,108,.3) !important;
+    padding:4px 12px !important;
+    border-radius:100px !important;
+  }
+  #rcl .report-body{ padding:22px !important; position:relative !important; }
+  #rcl .metrics-grid{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:10px !important;
+    margin-bottom:14px !important;
+  }
+  #rcl .metric-box{
+    background:#222E4A !important;
+    border:1px solid rgba(212,145,108,.15) !important;
+    border-radius:10px !important;
+    padding:14px 12px !important;
+    text-align:center !important;
+  }
+  #rcl .m-label{ font-size:11px !important; color:#9AAABB !important; margin-bottom:6px !important; letter-spacing:.04em !important; }
+  #rcl .m-val{ font-size:20px !important; font-weight:700 !important; color:#EAB89A !important; }
+  #rcl .m-val.t{ color:#4ECDC4 !important; }
+  #rcl .m-val.a{ color:#FFB347 !important; }
+  #rcl .m-val.p{ color:#F9A8D4 !important; }
+
+  #rcl .bar-sec{ margin-bottom:14px !important; }
+  #rcl .bar-lbl{ font-size:13px !important; color:#9AAABB !important; margin-bottom:8px !important; }
+  #rcl .bar-track{ width:100% !important; height:8px !important; background:#222E4A !important; border-radius:100px !important; overflow:hidden !important; }
+
+  /* ✅ bar-fill 공통화 */
+  #rcl .bar-fill,
+  #rcl .bar-fill-teal{
+    height:100% !important;
+    border-radius:100px !important;
+    transition:width 1.2s ease !important;
+  }
+  #rcl .bar-fill{ background:linear-gradient(90deg,#D4916C,#EAB89A) !important; }
+  #rcl .bar-fill-teal{ background:linear-gradient(90deg,#4ECDC4,#7FE8E2) !important; }
+
+  #rcl .report-lock{
+    position:absolute !important;
+    bottom:0 !important; left:0 !important;
+    width:100% !important;
+    height:55% !important;
+    background:linear-gradient(to bottom, transparent 0%, rgba(26,37,64,.97) 55%) !important;
+    display:flex !important;
+    align-items:flex-end !important;
+    justify-content:center !important;
+    padding-bottom:24px !important;
+  }
+  #rcl .lock-btn{
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+    background:#D4916C !important;
+    color:#fff !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    padding:10px 24px !important;
+    border-radius:50px !important;
+    border:none !important;
+    cursor:pointer !important;
+    box-shadow:0 4px 18px rgba(212,145,108,.45) !important;
+  }
+
+  /* ════════════════════════════
+     § 6 PRICING
+     ════════════════════════════ */
+  #rcl .pricing-sec{ background:#1A2540 !important; }
+  #rcl .plans{ display:flex !important; flex-direction:column !important; gap:16px !important; }
+  #rcl .plan{
+    background:#222E4A !important;
+    border:1px solid rgba(212,145,108,.18) !important;
+    border-radius:14px !important;
+    padding:26px 22px !important;
+    position:relative !important;
+    transition:transform .25s !important;
+  }
+  #rcl .plan:hover{ transform:translateY(-4px) !important; }
+  #rcl .plan.featured{
+    border-color:rgba(212,145,108,.5) !important;
+    background:linear-gradient(160deg, rgba(212,145,108,.08), #222E4A) !important;
+  }
+  #rcl .plan-tag{
+    position:absolute !important;
+    top:-12px !important; left:22px !important;
+    background:#D4916C !important;
+    color:#fff !important;
+    font-size:11px !important;
+    font-weight:700 !important;
+    padding:4px 14px !important;
+    border-radius:100px !important;
+  }
+  #rcl .plan-name{ font-size:13px !important; font-weight:700 !important; color:#9AAABB !important; letter-spacing:.08em !important; text-transform:uppercase !important; margin-bottom:6px !important; }
+  #rcl .plan-price{ font-size:34px !important; font-weight:700 !important; color:#F0ECE8 !important; margin-bottom:6px !important; }
+  #rcl .plan-price small{ font-size:15px !important; font-weight:400 !important; color:#9AAABB !important; margin-left:4px !important; }
+  #rcl .plan-desc{ font-size:13px !important; color:#9AAABB !important; margin-bottom:18px !important; line-height:1.6 !important; }
+  #rcl .plan-list{
+    list-style:none !important;
+    display:flex !important;
+    flex-direction:column !important;
+    gap:10px !important;
+    margin-bottom:22px !important;
+    padding:0 !important;
+  }
+  #rcl .plan-list li{
+    display:flex !important;
+    gap:10px !important;
+    align-items:flex-start !important;
+    font-size:14px !important;
+    color:#F0ECE8 !important;
+    line-height:1.55 !important;
+  }
+  #rcl .plan-list li.dim{ color:#9AAABB !important; }
+  #rcl .chk{ color:#4ECDC4 !important; font-weight:700 !important; min-width:14px !important; }
+  #rcl .dash{ color:#222E4A !important; font-weight:700 !important; min-width:14px !important; }
+
+  #rcl .pbtn{
+    width:100% !important;
+    padding:13px !important;
+    border-radius:50px !important;
+    font-size:15px !important;
+    font-weight:700 !important;
+    cursor:pointer !important;
+    border:none !important;
+    transition:opacity .2s, transform .2s !important;
+  }
+  #rcl .pbtn:hover{ transform:translateY(-1px) !important; opacity:.9 !important; }
+  #rcl .pbtn-out{ background:transparent !important; border:1px solid rgba(154,170,187,.35) !important; color:#F0ECE8 !important; }
+  #rcl .pbtn-fill{ background:linear-gradient(135deg,#D4916C,#BE7D5A) !important; color:#fff !important; box-shadow:0 4px 16px rgba(212,145,108,.35) !important; }
+
+  /* ════════════════════════════
+     § 7 FAQ
+     ════════════════════════════ */
+  #rcl .faq-sec{ background:#0F1626 !important; }
+  #rcl .faq-list{ display:flex !important; flex-direction:column !important; gap:10px !important; }
+  #rcl .faq-item{ background:#1A2540 !important; border:1px solid rgba(212,145,108,.18) !important; border-radius:14px !important; overflow:hidden !important; }
+  #rcl .faq-q{
+    padding:16px 18px !important;
+    font-size:15px !important;
+    font-weight:700 !important;
+    color:#F0ECE8 !important;
+    cursor:pointer !important;
+    display:flex !important;
+    justify-content:space-between !important;
+    align-items:center !important;
+    gap:12px !important;
+    user-select:none !important;
+    transition:color .2s !important;
+    background:transparent !important;
+  }
+  #rcl .faq-q:hover{ color:#EAB89A !important; }
+  #rcl .faq-arrow{
+    min-width:22px !important; height:22px !important;
+    border-radius:50% !important;
+    border:1px solid rgba(212,145,108,.25) !important;
+    display:flex !important; align-items:center !important; justify-content:center !important;
+    font-size:11px !important;
+    color:#D4916C !important;
+    transition:transform .3s !important;
+  }
+  #rcl .faq-item.open .faq-arrow{ transform:rotate(180deg) !important; }
+  #rcl .faq-a{
+    max-height:0 !important;
+    overflow:hidden !important;
+    transition:max-height .35s ease, padding .35s ease !important;
+    font-size:14px !important;
+    color:#9AAABB !important;
+    line-height:1.7 !important;
+    word-break:keep-all !important;
+    padding:0 18px !important;
+  }
+  #rcl .faq-item.open .faq-a{ max-height:320px !important; padding:0 18px 16px !important; }
+
+  /* ════════════════════════════
+     § 8 FINAL CTA
+     ════════════════════════════ */
+  #rcl .fcta{
+    background:linear-gradient(160deg,#1A2540,#222E4A) !important;
+    padding:76px 0 !important;
+    text-align:center !important;
+    border-top:1px solid rgba(212,145,108,.15) !important;
+  }
+  #rcl .fcta-title{
+    font-size:clamp(22px,5.5vw,32px) !important;
+    font-weight:700 !important;
+    color:#F0ECE8 !important;
+    line-height:1.4 !important;
+    margin-bottom:14px !important;
+    word-break:keep-all !important;
+  }
+  #rcl .fcta-sub{ font-size:15px !important; color:#9AAABB !important; margin-bottom:32px !important; word-break:keep-all !important; }
+
+  /* ════════════════════════════
+     FOOTER
+     ════════════════════════════ */
+  #rcl footer{
+    background:#0F1626 !important;
+    color:#7a8593 !important;
+    padding:50px 20px 30px !important;
+    border-top:1px solid rgba(212,145,108,.15) !important;
+  }
+  #rcl .footer-container{
+    max-width:900px !important;
+    margin:0 auto !important;
+    text-align:center !important;
+  }
+  #rcl .footer-logo{
+    font-size:24px !important;
+    font-weight:700 !important;
+    margin-bottom:25px !important;
+    color:#a8b2c1 !important;
+    letter-spacing:-0.5px !important;
+  }
+  #rcl .footer-logo span{ color:#D4916C !important; }
+  #rcl .footer-links{
+    display:flex !important;
+    justify-content:center !important;
+    gap:20px !important;
+    margin-bottom:30px !important;
+    padding-bottom:20px !important;
+  }
+  #rcl .footer-links a{
+    color:#a8b2c1 !important;
+    font-size:14px !important;
+    font-weight:400 !important;
+    transition:color 0.3s !important;
+  }
+  #rcl .footer-links a:hover{ color:#ffffff !important; }
+
+  #rcl .disclaimer{
+    font-size:13px !important;
+    color:#7a8593 !important;
+    line-height:1.7 !important;
+    margin:25px auto 30px !important;
+    max-width:900px !important;
+    padding:0 20px !important;
+    word-break:keep-all !important;
+  }
+
+  #rcl .footer-business-info{
+    margin:30px auto 25px !important;
+    padding:0 20px !important;
+    max-width:900px !important;
+    font-size:13px !important;
+    color:#7a8593 !important;
+    line-height:1.9 !important;
+  }
+  #rcl .footer-business-info p{ margin:8px 0 !important; }
+  #rcl .footer-business-info strong{ color:#a8b2c1 !important; font-weight:500 !important; }
+
+  #rcl .footer-copy{
+    font-size:13px !important;
+    color:#5a6470 !important;
+    margin-top:30px !important;
+    padding-top:20px !important;
+    border-top:1px solid #2a3142 !important;
+  }
+
+  /* ──────────────────────────
+     반응형(모바일) 통합 블록
+     ────────────────────────── */
+  @media (max-width:768px){
+    #rcl .footer-links{ flex-direction:column !important; gap:12px !important; }
+    #rcl .footer-links a{ display:block !important; }
+    #rcl .disclaimer{ font-size:12px !important; line-height:1.6 !important; }
+    #rcl .footer-business-info{ font-size:11px !important; line-height:1.8 !important; }
+    #rcl .footer-business-info p{ margin:10px 0 !important; }
+    #rcl .footer-copy{ font-size:11px !important; }
+  }
+
+  @media (max-width:480px){
+    #rcl footer{ padding:40px 15px 25px !important; }
+    #rcl .footer-logo{ font-size:20px !important; margin-bottom:20px !important; }
+    #rcl .footer-links{ gap:10px !important; }
+    #rcl .footer-links a{ font-size:13px !important; }
+    #rcl .footer-business-info{ font-size:10px !important; }
+
+    /* 네비 */
+    #rcl-nav{ padding:10px 12px !important; gap:10px !important; }
+    #rcl-nav .nav-left{ gap:10px !important; }
+    #rcl-nav .logo{
+      font-size:16px !important;
+      max-width:140px !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
+      white-space:nowrap !important;
+    }
+    #rcl-nav .sns-btn{ width:28px !important; height:28px !important; }
+    #rcl-nav .sns-btn svg,
+    #rcl-nav .sns-btn svg path{ width:14px !important; height:14px !important; }
+    #rcl-nav .nav-cta{ font-size:12px !important; padding:7px 12px !important; border-radius:999px !important; }
+
+    /* 히어로 버튼 세로 정렬 */
+    #rcl .hero-btns{ flex-direction:column !important; align-items:flex-start !important; }
+
+    /* 플로팅 버튼 축소 */
+    #rcl-float{ font-size:12px !important; padding:10px 14px !important; right:12px !important; bottom:16px !important; }
+  }
+
+  @media (max-width:360px){
+    #rcl-nav .logo{ max-width:110px !important; }
+    #rcl-nav .nav-cta{ padding:7px 10px !important; }
+  }
+</style>
+
+<!-- ════════════════ NAV ════════════════ -->
+<nav id="rcl-nav">
+  <div class="nav-left">
+    <div class="logo">리커넥트<span>랩</span></div>
+
+    <div class="sns-links">
+      <a class="sns-btn" href="https://www.instagram.com/reconnect_lab" target="_blank" title="인스타그램" aria-label="Instagram">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+        </svg>
+      </a>
+
+      <a class="sns-btn" href="https://www.youtube.com/@YOUR_CHANNEL" target="_blank" title="유튜브" aria-label="YouTube">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  <button class="nav-cta" onclick="rclScroll('free-plan')">무료 진단 시작</button>
+</nav>
+
+<!-- ════════════════ FLOAT (카카오톡) ════════════════ -->
+<a id="rcl-float" href="https://pf.kakao.com/_xdTxmqX" target="_blank">
+  <svg class="kakao-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2C6.48 2 2 5.92 2 10.8c0 3.13 1.77 5.88 4.44 7.5l-1.16 4.25c-.1.37.28.67.6.48L10.8 20.4c.39.05.79.08 1.2.08 5.52 0 10-3.92 10-8.8S17.52 2 12 2z" fill="#391B1B"/>
+  </svg>
+  카카오 채널 추가
+</a>
+
+<!-- ════════════════ 메인 래퍼 ════════════════ -->
+<div id="rcl">
+
+  <!-- § 1. HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <p class="hero-kicker fade">관계 진단 리포트 서비스</p>
+      <h1 class="hero-title fade fd1">
+        연락하고 싶은 마음,<br>
+        <em>지금 타이밍이 맞을까요?</em>
+      </h1>
+      <p class="hero-sub fade fd2">
+        감정이 아닌 데이터로 확인하세요.<br>
+        행동 패턴을 분석해 지금 관계 상태와<br>
+        적절한 접근 방향을 알려드립니다.
+      </p>
+      <div class="hero-btns fade fd3">
+        <button class="btn-p" onclick="rclScroll('free-plan')">무료로 관계 진단받기 →</button>
+        <button class="btn-s" onclick="rclScroll('rcl-sample')">샘플 리포트 보기</button>
+      </div>
+      <div class="hero-badges fade fd4">
+        <div class="badge-item"><div class="badge-icon">🔒</div><span>대화 내용 수집 없음</span></div>
+        <div class="badge-item"><div class="badge-icon">⏱</div><span>3분이면 충분해요</span></div>
+        <div class="badge-item"><div class="badge-icon">📊</div><span>행동 데이터 기반 분석</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- § 2. EMPATHY -->
+  <section class="sec empathy">
+    <div class="wrap">
+      <span class="tag fade">지금 이런 마음이신가요?</span>
+      <h2 class="sec-title fade">혹시 이 중에 해당되시나요?</h2>
+      <p class="sec-sub fade">해당되는 항목이 많을수록, 지금 상황 분석이 필요한 시점일 수 있어요.</p>
+      <div class="checklist">
+        <div class="check-item fade fd1"><div class="check-dot"></div><p class="check-txt">연락하고 싶은데 먼저 하면 안 될 것 같아요</p></div>
+        <div class="check-item fade fd2"><div class="check-dot"></div><p class="check-txt">읽씹 당한 후 어떻게 대응해야 할지 모르겠어요</p></div>
+        <div class="check-item fade fd3"><div class="check-dot"></div><p class="check-txt">새 애인이 생긴 것 같아 두렵고 초조해요</p></div>
+        <div class="check-item fade fd4"><div class="check-dot"></div><p class="check-txt">연락 타이밍이 맞는지 계속 망설여지고 있어요</p></div>
+        <div class="check-item fade"><div class="check-dot"></div><p class="check-txt">감정적으로 잘못된 행동을 이미 해버린 것 같아요</p></div>
+      </div>
+      <div class="bridge fade">
+        <strong>맞아요, 그 마음 충분히 알아요.</strong><br>
+        하지만 감정이 앞서면 관계는 더 멀어질 수 있어요.<br>
+        지금 상황을 데이터로 먼저 확인해보세요.
+      </div>
+    </div>
+  </section>
+
+  <!-- § 3. FACTS -->
+  <section class="sec facts-sec">
+    <div class="wrap">
+      <span class="tag fade">관계 회복의 함정</span>
+      <h2 class="sec-title fade">재회를 어렵게 만드는<br>대표적인 실수들</h2>
+      <p class="sec-sub fade">많은 분들이 놓치는 부분이에요. 패턴을 알면 접근이 달라집니다.</p>
+      <div class="fact-grid">
+        <div class="fact-card fc-warn fade fd1">
+          <div class="fact-num">⚠ 실수 01</div>
+          <div class="fact-lbl">읽씹 후 즉각적인 재연락</div>
+          <div class="fact-desc">상대가 거리를 두고 있는 신호일 수 있습니다. 감정적으로 바로 재연락하는 경우, 관계 회복 가능성이 낮아질 수 있다는 분석이 있습니다.</div>
+        </div>
+        <div class="fact-card fc-caution fade fd2">
+          <div class="fact-num">⚠ 실수 02</div>
+          <div class="fact-lbl">이별 직후 감정 토로</div>
+          <div class="fact-desc">이별 직후의 감정적인 연락은 상대에게 부담으로 작용할 수 있어요. 충분한 시간과 냉각 기간이 필요할 수 있습니다.</div>
+        </div>
+        <div class="fact-card fc-info fade fd3">
+          <div class="fact-num">💡 팁</div>
+          <div class="fact-lbl">타이밍과 접근 방식이 핵심</div>
+          <div class="fact-desc">어떤 말을 하느냐보다, 언제·어떻게 접근하느냐가 관계 회복에 더 중요하게 작용한다는 분석 결과가 있습니다.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- § 4. HOW IT WORKS -->
+  <section class="sec how-sec">
+    <div class="wrap">
+      <span class="tag fade">이용 방법</span>
+      <h2 class="sec-title fade">3단계로 관계 상태를<br>진단받으세요</h2>
+      <p class="sec-sub fade">복잡한 상담 없이, 객관적인 데이터 입력만으로 분석이 가능해요.</p>
+      <div class="steps">
+        <div class="step fade fd1">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-icon">📝</div>
+            <div class="step-title">데이터 입력</div>
+            <div class="step-desc">연락 빈도, 평균 답장 시간, 마지막 연락 시점, 이별 경위 등 객관적인 행동 정보를 입력합니다. 대화 내용은 필요 없어요.</div>
+          </div>
+        </div>
+        <div class="step fade fd2">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-icon">🔍</div>
+            <div class="step-title">AI 패턴 분석</div>
+            <div class="step-desc">입력된 행동 데이터를 기반으로 관계 거리 지수와 감정 온도를 산출하고, 현재 관계 패턴을 분석합니다.</div>
+          </div>
+        </div>
+        <div class="step fade fd3">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-icon">📋</div>
+            <div class="step-title">리포트 제공</div>
+            <div class="step-desc">분석 결과와 함께 현재 상황에 맞는 방향성과 주의할 행동 패턴을 알려드립니다. 프리미엄은 더 구체적인 가이드를 포함합니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- § 5. SAMPLE -->
+  <section id="rcl-sample" class="sec sample-sec">
+    <div class="wrap">
+      <span class="tag fade">리포트 미리보기</span>
+      <h2 class="sec-title fade">실제 분석 리포트는<br>이렇게 생겼어요</h2>
+      <p class="sec-sub fade">프리미엄 리포트의 일부를 미리 확인해보세요.</p>
+      <div class="report-card fade">
+        <div class="report-hd">
+          <div class="report-title-row">
+            <div class="rpt-icon">📊</div>
+            <div>
+              <div class="rpt-name">관계 진단 리포트</div>
+              <div class="rpt-date">분석 완료 · 리커넥트랩</div>
+            </div>
+          </div>
+          <div class="rpt-badge">프리미엄</div>
+        </div>
+        <div class="report-body">
+          <div class="metrics-grid">
+            <div class="metric-box"><div class="m-label">관계 거리 지수</div><div class="m-val">6.2</div></div>
+            <div class="metric-box"><div class="m-label">감정 온도</div><div class="m-val t">미지근</div></div>
+            <div class="metric-box"><div class="m-label">접근 적정 시기</div><div class="m-val a">2–3주 후</div></div>
+            <div class="metric-box"><div class="m-label">현재 위험 신호</div><div class="m-val p">감지됨</div></div>
+          </div>
+          <div class="bar-sec">
+            <div class="bar-lbl">관계 회복 가능성 지수</div>
+            <div class="bar-track"><div class="bar-fill" id="rcl-bar1" style="width:0%"></div></div>
+          </div>
+          <div class="bar-sec">
+            <div class="bar-lbl">현재 감정 안정도</div>
+            <div class="bar-track"><div class="bar-fill-teal" id="rcl-bar2" style="width:0%"></div></div>
+          </div>
+          <div class="report-lock">
+            <button class="lock-btn" onclick="rclScroll('free-plan')">🔒 전체 리포트 확인하기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- § 6. PRICING -->
+  <section class="sec pricing-sec">
+    <div class="wrap">
+      <span class="tag fade">요금제</span>
+      <h2 class="sec-title fade">필요한 만큼만<br>선택하세요</h2>
+      <p class="sec-sub fade">지금 상황이 궁금하다면 무료로 먼저 시작해보세요.</p>
+      <div class="plans">
+        <div id="free-plan" class="plan fade fd1">
+          <div class="plan-name">FREE</div>
+          <div class="plan-price">₩0 <small>/ 1회</small></div>
+          <div class="plan-desc">관계 기본 상태를 지금 바로 확인해보세요.</div>
+          <ul class="plan-list">
+            <li><span class="chk">✓</span> 관계 거리 지수 확인</li>
+            <li><span class="chk">✓</span> 감정 온도 기본 진단</li>
+            <li><span class="chk">✓</span> 현재 관계 상태 요약</li>
+            <li class="dim"><span class="dash">—</span> 시계열 패턴 분석</li>
+            <li class="dim"><span class="dash">—</span> 접근 방향 가이드</li>
+            <li class="dim"><span class="dash">—</span> 맞춤 행동 제안</li>
+          </ul>
+          <button class="pbtn pbtn-out" onclick="location.href='/free-survey'">무료 진단 시작하기</button>
+        </div>
+
+        <div class="plan featured fade fd2">
+          <div class="plan-tag">✦ 추천</div>
+          <div class="plan-name">PREMIUM</div>
+          <div class="plan-price">₩29,000 <small>/ 1회</small></div>
+          <div class="plan-desc">구체적인 방향과 접근 전략이 필요한 분께 추천해요.</div>
+          <ul class="plan-list">
+            <li><span class="chk">✓</span> 관계 거리 지수 확인</li>
+            <li><span class="chk">✓</span> 감정 온도 기본 진단</li>
+            <li><span class="chk">✓</span> 현재 관계 상태 요약</li>
+            <li><span class="chk">✓</span> 시계열 패턴 분석</li>
+            <li><span class="chk">✓</span> 접근 방향 가이드</li>
+            <li><span class="chk">✓</span> 맞춤 행동 제안</li>
+          </ul>
+          <!-- ✅ 환불규정 요약 추가 -->
+  <div style="font-size:11px !important; color:#9AAABB !important; margin:12px 0 18px !important; line-height:1.6 !important; padding:10px !important; background:rgba(212,145,108,.08) !important; border-radius:8px !important; border-left:2px solid #D4916C !important;">
+    ⓘ 리포트 발급 전 전액 환불 가능 / 발급 후 환불 불가
+  </div>
+          <button class="pbtn pbtn-fill" onclick="location.href='/free-survey'">프리미엄 진단 받기</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- § 7. FAQ -->
+  <section class="sec faq-sec">
+    <div class="wrap">
+      <span class="tag fade">자주 묻는 질문</span>
+      <h2 class="sec-title fade">궁금한 점이 있으신가요?</h2>
+      <div class="faq-list fade">
+        <div class="faq-item">
+          <div class="faq-q">이 서비스는 연애 상담인가요?<span class="faq-arrow">▾</span></div>
+          <div class="faq-a">아니요. 리커넥트랩은 연애 상담 서비스가 아닙니다. 사용자가 직접 입력한 행동 데이터(연락 빈도, 답장 시간, 만남 빈도 등)를 기반으로 관계 패턴을 분석하는 정보 제공 서비스입니다.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">대화 내용을 입력해야 하나요?<span class="faq-arrow">▾</span></div>
+          <div class="faq-a">아닙니다. 대화 내용은 전혀 수집하지 않아요. 연락 빈도, 평균 답장 시간, 마지막 연락 시점 등 객관적인 행동 데이터만 입력하시면 됩니다.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">개인정보는 어떻게 처리되나요?<span class="faq-arrow">▾</span></div>
+          <div class="faq-a">입력된 정보는 분석 목적으로만 사용되며, 일정 기간 후 자동으로 삭제됩니다. 제3자에게 제공하지 않습니다.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">무료와 프리미엄의 차이는 무엇인가요?<span class="faq-arrow">▾</span></div>
+          <div class="faq-a">무료는 현재 관계의 기본 진단(거리 지수·감정 온도)을 제공합니다. 프리미엄은 시계열 패턴 분석, 접근 적정 시기 제안, 구체적인 행동 가이드까지 포함합니다.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">분석 결과가 100% 정확한가요?<span class="faq-arrow">▾</span></div>
+          <div class="faq-a">아닙니다. 본 서비스의 분석 결과는 입력된 행동 데이터 기반의 참고용 정보이며, 개인별 상황에 따라 결과가 다를 수 있습니다. 최종 판단은 사용자 본인이 하시길 권장합니다.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">결제 후 서비스 이용기간은 어떻게 되나요?<span class="faq-arrow">▾</span></div>
+          <div class="faq-a">결제 완료 후 프리미엄 리포트가 생성되며, 생성된 리포트는 결제일 기준 30일 동안 언제든지 열람하실 수 있습니다. </div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">환불 규정이 어떻게 되나요?<span class="faq-arrow">▾</span></div>
+          <div class="faq-a">
+          <strong>[무료 플랜]</strong> 환불 대상이 아닙니다.<br><br>
+          <strong>[프리미엄 플랜]</strong><br>
+          • 리포트 발급 전: 전액 환불 가능 (수수료 없음)<br>
+          • 리포트 발급 후: 서비스 제공 완료로 환불 불가<br>
+          • 시스템 오류로 리포트 미발급 시: 전액 환불<br>
+          • 부분 환불은 불가하며, 환불 요청은 이메일(als980704@naver.com)로 접수 가능합니다.<br><br>
+          <strong>[환불 처리 기간]</strong> 승인 후 3-5 영업일 이내 (결제수단별 상이)
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- § 8. FINAL CTA -->
+  <section class="fcta">
+    <div class="wrap">
+      <h2 class="fcta-title fade">지금 이 순간에도<br>타이밍이 지나가고 있을 수 있어요.</h2>
+      <p class="fcta-sub fade">감정이 아닌 데이터로 먼저 확인하세요.<br>무료 분석은 3분이면 충분합니다.</p>
+      <button class="btn-p fade" onclick="rclScroll('free-plan')">지금 무료 분석 시작하기 →</button>
+    </div>
+  </section>
+  
+  <!-- ════════════════ FOOTER ════════════════ -->
+  <footer>
+    <div class="footer-container">
+      <div class="footer-logo">리커넥트<span>랩</span></div>
+      
+      <div class="footer-links">
+        <a href="http://reconnectlab.co.kr/?mode=policy">이용약관</a>
+        <a href="http://reconnectlab.co.kr/?mode=privacy">개인정보처리방침</a>
+        <a href="https://pf.kakao.com/_xdTxmqX">문의하기</a>
+      </div>
+      
+      <p class="disclaimer">
+        본 서비스의 분석 결과 및 수치는 자체 데이터 모델 기반의 참고 추정치이며, 법적 효력을 갖는 통계가 아닙니다.<br>
+        개인별 상황에 따라 결과가 다를 수 있으며, 본 서비스는 연애 상담이 아닌 정보 제공 서비스입니다.
+      </p>
+      
+      <div class="footer-business-info">
+        <p><strong>대표:</strong> 이민지 | <strong>사업자등록번호:</strong> 113-78-00630</p>
+        <p><strong>주소:</strong> 전북특별자치도 전주시 완산구 배학2길 37-2 202호</p>
+        <p><strong>통신판매업신고번호:</strong> 제0000-지역-00000호 | <strong>연락처:</strong> 010-5570-6562</p>
+      </div>
+      
+      <p class="footer-copy">© 2026 리커넥트랩. All rights reserved.</p>
+    </div>
+  </footer>
+
+</div><!-- /#rcl -->
+
+<script>
+  (function () {
+    /* ── 스크롤 ── */
+    function rclScroll(id) {
+      var el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    window.rclScroll = rclScroll;
+
+    /* ── 페이드인 (안전 폴백 포함) ── */
+    document.querySelectorAll('#rcl .fade').forEach(function (el) { el.classList.add('will-animate'); });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.05 });
+    document.querySelectorAll('#rcl .fade').forEach(function (el) { io.observe(el); });
+    setTimeout(function () {
+      document.querySelectorAll('#rcl .fade.will-animate').forEach(function (el) {
+        el.classList.add('visible');
+      });
+    }, 2000);
+
+    /* ── 바 애니메이션 ── */
+    var barIO = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          var b1 = document.getElementById('rcl-bar1');
+          var b2 = document.getElementById('rcl-bar2');
+          if (b1) b1.style.width = '62%';
+          if (b2) b2.style.width = '48%';
+          barIO.disconnect();
+        }
+      });
+    }, { threshold: 0.3 });
+    var sample = document.getElementById('rcl-sample');
+    if (sample) barIO.observe(sample);
+
+    /* ── FAQ 아코디언 ── */
+    document.querySelectorAll('#rcl .faq-q').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var item = btn.parentElement;
+        var isOpen = item.classList.contains('open');
+        document.querySelectorAll('#rcl .faq-item.open').forEach(function (i) { i.classList.remove('open'); });
+        if (!isOpen) item.classList.add('open');
+      });
+    });
+
+    /* ── 플로팅 버튼: 히어로 구간에선 숨김 ── */
+    var floatBtn = document.getElementById('rcl-float');
+    var heroEl = document.querySelector('#rcl .hero');
+    if (floatBtn && heroEl) {
+      var heroIO = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          floatBtn.style.opacity = e.isIntersecting ? '0' : '1';
+          floatBtn.style.pointerEvents = e.isIntersecting ? 'none' : 'auto';
+        });
+      }, { threshold: 0.15 });
+      heroIO.observe(heroEl);
+    }
+  })();
+</script>

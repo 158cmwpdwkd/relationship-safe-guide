@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes_survey import router as survey_router
 from app.routes_report import router as report_router
 from app.routes_admin import router as admin_router
+from app.routes_payments import router as payments_router
 
 from app.db import engine, Base
 from app.models import UserSession, Order, PaidSurvey, Report, MessageSchedule
@@ -52,3 +53,4 @@ async def shutdown():
 app.include_router(survey_router)
 app.include_router(report_router)
 app.include_router(admin_router)
+app.include_router(payments_router)
