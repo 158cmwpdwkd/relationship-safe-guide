@@ -9,9 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <!-- 이니시스 웹표준결제 -->
-  <script src="https://stdpay.inicis.com/stdjs/INIStdPay.js" charset="UTF-8"></script>
-
   <style>
     /* ──────────────────────────
        RESET / BASE
@@ -514,11 +511,9 @@
     </div>
   </footer>
 
-  <!-- 이니시스 결제용 숨김 form -->
-  <form id="inicisPayForm" method="POST" accept-charset="UTF-8" style="display:none;"></form>
-
   <script>
     const API_BASE = "https://relationship-safe-guide-api.onrender.com";
+    const PAYMENT_START_URL = API_BASE + "/pay/start";
     const HOME_URL = "https://reconnectlab.co.kr/";
     const REPORT_TOKEN_STORAGE_KEY = "rl_report_token";
 
@@ -696,59 +691,24 @@
         if (btn) {
           btn.style.pointerEvents = "none";
           btn.style.opacity = "0.7";
-          btn.innerHTML = "결제창 준비 중...";
+          btn.innerHTML = "결제창으로 이동 중...";
         }
 
-        const response = await fetch(API_BASE + "/api/payments/inicis/prepare", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            reportToken: reportToken,
-            buyerName: "고객",
-            buyerEmail: "help@reconnectlab.co.kr",
-            buyerTel: "010-0000-0000"
-          })
-        });
+        const url = new URL(PAYMENT_START_URL);
+        url.searchParams.set("report_token", reportToken);
 
-        const data = await response.json();
-
-        if (!response.ok || !data.ok || !data.form) {
-          throw new Error(data.detail || "결제 요청 데이터 생성 실패");
-        }
-
-        const form = document.getElementById("inicisPayForm");
-        if (!form) {
-          throw new Error("결제 form을 찾을 수 없습니다.");
-        }
-
-        form.innerHTML = "";
-
-        Object.entries(data.form).forEach(([key, value]) => {
-          if (value === null || value === undefined) return;
-
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = key;
-          input.value = String(value);
-          form.appendChild(input);
-        });
-
-        if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {
-          throw new Error("INIStdPay 스크립트가 로드되지 않았습니다.");
-        }
-
-        INIStdPay.pay("inicisPayForm");
+        window.location.href = url.toString();
       } catch (error) {
-        console.error("[RCL] goPremiumPay error:", error);
-        alert("결제창을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        console.error("[RCL] goPremiumPay redirect error:", error);
+        alert("결제 페이지로 이동하지 못했어요. 잠시 후 다시 시도해주세요.");
       } finally {
-        if (btn) {
-          btn.style.pointerEvents = "";
-          btn.style.opacity = "";
-          btn.innerHTML = originalText;
-        }
+        setTimeout(() => {
+          if (btn) {
+            btn.style.pointerEvents = "";
+            btn.style.opacity = "";
+            btn.innerHTML = originalText;
+          }
+        }, 1500);
       }
     }
   </script>
