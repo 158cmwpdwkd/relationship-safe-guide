@@ -32,6 +32,3 @@ tzdata==2025.3
 uvicorn==0.30.6
 watchfiles==1.1.1
 websockets==16.0
-[0x61032730] ANOMALY: meaningless REX prefix used
-[0x610334B0] ANOMALY: meaningless REX prefix used
-[0x61034400] ANOMALY: meaningless REX prefix used
