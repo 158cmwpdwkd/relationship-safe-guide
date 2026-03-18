@@ -49,8 +49,8 @@ class PaidSurveyAnswers(InterpretationBaseModel):
     q15: str
     q16: str
     q17: str
-    q18: str
-    q19: str
+    q18: List[str]
+    q19: List[str]
     q20: str
 
     # 기타/직접입력 대응
@@ -69,7 +69,6 @@ class PaidSurveyRequest(InterpretationBaseModel):
 
     schema_version: InterpretationSchemaVersion = "paid_survey_v1"
 
-    sid: str = Field(..., min_length=1, max_length=64)
     order_id: str = Field(..., min_length=1, max_length=64)
     report_token: str = Field(..., min_length=1, max_length=128)
 

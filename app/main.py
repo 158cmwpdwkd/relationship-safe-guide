@@ -4,6 +4,9 @@ import asyncpg
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from app.routes_survey import router as survey_router
 from app.routes_report import router as report_router
 from app.routes_admin import router as admin_router

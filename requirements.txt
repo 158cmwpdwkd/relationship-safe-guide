@@ -1,12 +1,37 @@
+﻿alembic==1.13.2
+annotated-types==0.7.0
+anyio==4.12.1
+certifi==2026.2.25
+click==8.3.1
+colorama==0.4.6
 fastapi==0.115.0
-uvicorn[standard]==0.30.6
-SQLAlchemy==2.0.34
-psycopg[binary]==3.2.3
-alembic==1.13.2
+greenlet==3.3.2
+h11==0.16.0
+httpcore==1.0.9
+httptools==0.7.1
+httpx==0.28.1
+idna==3.11
+iniconfig==2.3.0
+Mako==1.3.10
+Markdown==3.7
+MarkupSafe==3.0.3
+packaging==26.0
+pluggy==1.6.0
+psycopg==3.2.3
+psycopg-binary==3.2.3
 pydantic==2.8.2
+pydantic_core==2.20.1
+Pygments==2.19.2
+pytest==9.0.2
 python-dotenv==1.0.1
-markdown==3.7
-asyncpg
-jinja2
-httpx==0.27.2
-python-multipart==0.0.9
+PyYAML==6.0.3
+SQLAlchemy==2.0.34
+starlette==0.38.6
+typing_extensions==4.15.0
+tzdata==2025.3
+uvicorn==0.30.6
+watchfiles==1.1.1
+websockets==16.0
+[0x61032730] ANOMALY: meaningless REX prefix used
+[0x610334B0] ANOMALY: meaningless REX prefix used
+[0x61034400] ANOMALY: meaningless REX prefix used
