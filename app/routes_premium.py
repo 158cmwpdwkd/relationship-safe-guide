@@ -220,6 +220,7 @@ def generate_premium_report_payload(
         sid=report.sid,
         prompt=result["prompt"],
         interpretation_result=result["interpretation_result"],
+        metrics=result["metrics"],
         meta=result["meta"],
     )
 
@@ -267,6 +268,7 @@ def finalize_premium_report(
             status=report.status,
             prompt=preview["prompt"],
             interpretation_result=preview["interpretation_result"],
+            metrics=preview["metrics"],
             markdown=report.markdown,
             html=report.html,
             meta={**preview["meta"], "reused_existing": True},
@@ -278,7 +280,10 @@ def finalize_premium_report(
 
     try:
         markdown_text = generate_premium_markdown(preview["prompt"])
-        html_text = render_premium_report_html(markdown_text)
+        html_text = render_premium_report_html(
+            markdown_text,
+            metrics=preview["metrics"],
+        )
 
         report.markdown = markdown_text
         report.html = html_text
@@ -296,6 +301,7 @@ def finalize_premium_report(
             status=report.status,
             prompt=preview["prompt"],
             interpretation_result=preview["interpretation_result"],
+            metrics=preview["metrics"],
             markdown=report.markdown,
             html=report.html,
             meta={**preview["meta"], "report_url": f"/r/{payload.report_token}"},

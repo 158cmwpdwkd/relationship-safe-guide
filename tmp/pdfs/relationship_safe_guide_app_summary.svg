@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="816" height="1056" viewBox="0 0 816 1056">
+  <defs>
+    <style>
+      .bg { fill: #f5f7fb; }
+      .panel { fill: #ffffff; stroke: #d9e2f2; stroke-width: 1; }
+      .titlebar { fill: #17324d; }
+      .accent { fill: #2a6f97; }
+      .muted { fill: #5f6b7a; }
+      .title { font: 700 28px Arial, sans-serif; fill: #ffffff; }
+      .subtitle { font: 400 12px Arial, sans-serif; fill: #d8e6f3; }
+      .h { font: 700 15px Arial, sans-serif; fill: #17324d; }
+      .body { font: 400 11px Arial, sans-serif; fill: #1f2933; }
+      .small { font: 400 10px Arial, sans-serif; fill: #51606f; }
+      .mono { font: 400 9.5px 'Courier New', monospace; fill: #17324d; }
+      .bullet { font: 700 11px Arial, sans-serif; fill: #2a6f97; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="816" height="1056"/>
+  <rect class="titlebar" x="32" y="28" width="752" height="92" rx="18"/>
+  <text class="title" x="56" y="68">Relationship Safe Guide</text>
+  <text class="subtitle" x="56" y="92">One-page repo summary generated from code evidence only</text>
+  <text class="subtitle" x="56" y="110">FastAPI app with survey, payment, and premium report flows</text>
+
+  <rect class="panel" x="32" y="144" width="360" height="124" rx="14"/>
+  <rect class="accent" x="32" y="144" width="8" height="124" rx="4"/>
+  <text class="h" x="56" y="170">What It Is</text>
+  <text class="body" x="56" y="194">
+    <tspan x="56" dy="0">A FastAPI app that collects a free relationship-risk survey, computes</tspan>
+    <tspan x="56" dy="18">urgency and red flags, and serves a tokenized HTML report.</tspan>
+    <tspan x="56" dy="18">It also adds a paid premium flow with payment handling, deeper survey</tspan>
+    <tspan x="56" dy="18">intake, and OpenAI-based report generation.</tspan>
+  </text>
+
+  <rect class="panel" x="32" y="284" width="360" height="104" rx="14"/>
+  <rect class="accent" x="32" y="284" width="8" height="104" rx="4"/>
+  <text class="h" x="56" y="310">Who It's For</text>
+  <text class="body" x="56" y="334">
+    <tspan x="56" dy="0">Primary persona: a user seeking safety-oriented guidance about</tspan>
+    <tspan x="56" dy="18">reconnecting or responding in an unstable relationship context.</tspan>
+    <tspan x="56" dy="18">This is inferred from survey fields, red-flag checks, and premium</tspan>
+    <tspan x="56" dy="18">report prompts in the repo.</tspan>
+  </text>
+
+  <rect class="panel" x="32" y="404" width="360" height="368" rx="14"/>
+  <rect class="accent" x="32" y="404" width="8" height="368" rx="4"/>
+  <text class="h" x="56" y="430">What It Does</text>
+
+  <text class="bullet" x="56" y="458">•</text>
+  <text class="body" x="74" y="458">Accepts a free survey, validates consent, and enforces required answer fields.</text>
+
+  <text class="bullet" x="56" y="494">•</text>
+  <text class="body" x="74" y="494">Scores impulse + red flags into LOW, MEDIUM, HIGH, SOFT_GATE, or HARD_BLOCK.</text>
+
+  <text class="bullet" x="56" y="530">•</text>
+  <text class="body" x="74" y="530">Creates user sessions and report tokens, then serves a report URL for review.</text>
+
+  <text class="bullet" x="56" y="566">•</text>
+  <text class="body" x="74" y="566">Stores orders, paid survey answers, reports, and message schedules in the database.</text>
+
+  <text class="bullet" x="56" y="602">•</text>
+  <text class="body" x="74" y="602">Builds Inicis payment forms and handles return, failure, and virtual-bank notifications.</text>
+
+  <text class="bullet" x="56" y="638">•</text>
+  <text class="body" x="74" y="638">Checks paid access before accepting the premium survey or exposing premium status/report APIs.</text>
+
+  <text class="bullet" x="56" y="674">•</text>
+  <text class="body" x="74" y="674">Runs an interpretation pipeline, calls OpenAI, and renders premium markdown into HTML.</text>
+
+  <rect class="panel" x="32" y="788" width="360" height="236" rx="14"/>
+  <rect class="accent" x="32" y="788" width="8" height="236" rx="4"/>
+  <text class="h" x="56" y="814">How To Run</text>
+  <text class="body" x="56" y="838">
+    <tspan x="56" dy="0">1. Install dependencies:</tspan>
+    <tspan class="mono" x="72" dy="18">pip install -r requirements.txt</tspan>
+    <tspan class="body" x="56" dy="24">2. Set environment variables:</tspan>
+    <tspan class="mono" x="72" dy="18">DATABASE_URL, OPENAI_API_KEY</tspan>
+    <tspan class="body" x="72" dy="18">Payment flow also uses INICIS_MID and INICIS_SIGN_KEY.</tspan>
+    <tspan class="body" x="56" dy="24">3. Start the API:</tspan>
+    <tspan class="mono" x="72" dy="18">uvicorn app.main:app --reload</tspan>
+    <tspan class="body" x="56" dy="24">4. Open local routes as needed.</tspan>
+    <tspan class="body" x="72" dy="18">User setup docs / .env example: Not found in repo.</tspan>
+  </text>
+
+  <rect class="panel" x="424" y="144" width="360" height="520" rx="14"/>
+  <rect class="accent" x="424" y="144" width="8" height="520" rx="4"/>
+  <text class="h" x="448" y="170">How It Works</text>
+  <text class="body" x="448" y="198">
+    <tspan x="448" dy="0">Components and data flow, based on repo evidence:</tspan>
+  </text>
+
+  <text class="bullet" x="448" y="230">•</text>
+  <text class="body" x="466" y="230">Entrypoint: <tspan class="mono">app/main.py</tspan> creates the FastAPI app,</text>
+  <text class="body" x="466" y="248">CORS config, SQLAlchemy tables, and an asyncpg pool on startup.</text>
+
+  <text class="bullet" x="448" y="286">•</text>
+  <text class="body" x="466" y="286">Persistence: <tspan class="mono">app/db.py</tspan> configures SQLAlchemy;</text>
+  <text class="body" x="466" y="304"><tspan class="mono">app/models.py</tspan> defines <tspan class="mono">UserSession</tspan>, <tspan class="mono">Order</tspan>,</text>
+  <text class="body" x="466" y="322"><tspan class="mono">PaidSurvey</tspan>, <tspan class="mono">Report</tspan>, and <tspan class="mono">MessageSchedule</tspan>.</text>
+
+  <text class="bullet" x="448" y="360">•</text>
+  <text class="body" x="466" y="360">Free flow: <tspan class="mono">routes_survey.py</tspan> validates survey input,</text>
+  <text class="body" x="466" y="378">calls <tspan class="mono">compute_risk()</tspan>, stores session/report rows, and</text>
+  <text class="body" x="466" y="396">returns a report URL.</text>
+
+  <text class="bullet" x="448" y="416">•</text>
+  <text class="body" x="466" y="434">Report serving: <tspan class="mono">routes_report.py</tspan> loads report + session</text>
+  <text class="body" x="466" y="452">by token. If premium HTML exists and status is READY, it serves that;</text>
+  <text class="body" x="466" y="470">otherwise it falls back to free report HTML from <tspan class="mono">app/report.py</tspan>.</text>
+
+  <text class="bullet" x="448" y="490">•</text>
+  <text class="body" x="466" y="508">Payments: <tspan class="mono">routes_payments.py</tspan> creates order ids,</text>
+  <text class="body" x="466" y="526">signs requests, renders the Inicis payment page, verifies return data,</text>
+  <text class="body" x="466" y="544">and updates order status.</text>
+
+  <text class="bullet" x="448" y="546">•</text>
+  <text class="body" x="466" y="582">Premium flow: <tspan class="mono">routes_premium.py</tspan> checks paid access,</text>
+  <text class="body" x="466" y="600">saves paid survey answers, builds engine input, prepares prompts,</text>
+  <text class="body" x="466" y="618">finalizes markdown/html, and stores the premium report in <tspan class="mono">reports</tspan>.</text>
+
+  <text class="bullet" x="448" y="620">•</text>
+  <text class="body" x="466" y="656">Services: <tspan class="mono">app/services/interpretation</tspan> computes structured</text>
+  <text class="body" x="466" y="674">interpretation; <tspan class="mono">premium_pipeline.py</tspan> builds the prompt;</text>
+  <text class="body" x="466" y="692"><tspan class="mono">llm_client.py</tspan> calls OpenAI; <tspan class="mono">premium_renderer.py</tspan></text>
+  <text class="body" x="466" y="710">turns markdown into HTML.</text>
+
+  <rect class="panel" x="424" y="680" width="360" height="344" rx="14"/>
+  <rect class="accent" x="424" y="680" width="8" height="344" rx="4"/>
+  <text class="h" x="448" y="706">Evidence Notes</text>
+  <text class="small" x="448" y="732">
+    <tspan x="448" dy="0">Used files: app/main.py, app/db.py, app/models.py, app/risk.py,</tspan>
+    <tspan x="448" dy="17">app/routes_survey.py, app/routes_report.py, app/routes_payments.py,</tspan>
+    <tspan x="448" dy="17">app/routes_premium.py, app/services/reporting/*.py, and API tests.</tspan>
+    <tspan x="448" dy="28">Not found in repo:</tspan>
+    <tspan x="464" dy="17">• README or explicit getting-started guide</tspan>
+    <tspan x="464" dy="17">• .env example with required runtime variables</tspan>
+    <tspan x="464" dy="17">• Separate frontend app source or local UI startup instructions</tspan>
+    <tspan x="448" dy="28">Because of that, the run section uses the minimal command implied by the app entrypoint.</tspan>
+  </text>
+</svg>

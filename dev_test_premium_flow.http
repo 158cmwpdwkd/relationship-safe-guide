@@ -1,0 +1,427 @@
+### Premium flow manual test
+### Purpose:
+### 1) create free session/report token
+### 2) create PENDING order without PG approval
+### 3) force the order to PAID in DB
+### 4) save paid survey
+### 5) run generate -> finalize -> status
+### 6) open /r/{token}
+###
+### Important:
+### - This file follows the current project routes and models exactly.
+### - Real premium access checks still run. You must manually flip orders.status to PAID in DB after the prepare step.
+### - sid comes from /api/survey/free
+### - report_token is the same as free_token from /api/survey/free
+### - order_id comes from /api/payments/inicis/prepare response.form.oid
+
+@baseUrl = http://localhost:8000
+@buyerName = Premium Flow Test
+@buyerEmail = premium-flow-test@example.com
+@buyerTel = 010-1234-5678
+
+### ------------------------------------------------------------
+### 1) Free survey
+### Expected:
+### - 200 OK
+### - body.sid is created
+### - body.free_token is created
+### - body.next should be PAY for this payload
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/survey/free
+Content-Type: application/json
+
+{
+  "schema_version": "survey_v1",
+  "stage": "free",
+  "answers": {
+    "FREE_Q1_stop_work_7d": 1,
+    "FREE_Q2_sns_check_yesterday": 1,
+    "FREE_Q3_impulse_control_rate": 90,
+    "FREE_Q4_main_fear": "fear_abandonment",
+    "FREE_Q5_red_flags": ["rf_none"]
+  },
+  "contact": {
+    "phone": "01012345678",
+    "email": "premium-flow-test@example.com"
+  },
+  "consent": {
+    "privacy_consent": true
+  }
+}
+
+> {% 
+client.global.set("sid", response.body.sid);
+client.global.set("report_token", response.body.free_token);
+%}
+
+### ------------------------------------------------------------
+### 2) Create order in PENDING state
+### Expected:
+### - 200 OK
+### - body.ok = true
+### - body.form.oid is the new order_id
+### - DB orders.status should be PENDING
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/payments/inicis/prepare
+Content-Type: application/json
+
+{
+  "reportToken": "{{report_token}}",
+  "buyerName": "{{buyerName}}",
+  "buyerEmail": "{{buyerEmail}}",
+  "buyerTel": "{{buyerTel}}"
+}
+
+> {% 
+client.global.set("order_id", response.body.form.oid);
+%}
+
+### ------------------------------------------------------------
+### 3) Stop here and run SQL manually
+### Use one of these files:
+### - sql/test_premium_flow_postgres.sql
+### - sql/test_premium_flow_sqlite.sql
+###
+### Required manual DB update:
+### - orders.status -> PAID
+### - orders.paid_at -> current time
+### - keep orders.sid and reports.sid matched
+###
+### After the SQL update, continue below.
+### ------------------------------------------------------------
+
+### ------------------------------------------------------------
+### 4) Access check after manual PAID update
+### Expected:
+### - 200 OK
+### - body.ok = true
+### - If false/NOT_PAID, the DB update was not applied correctly
+### ------------------------------------------------------------
+GET {{baseUrl}}/api/premium/access-check?token={{report_token}}&orderId={{order_id}}
+
+### ------------------------------------------------------------
+### 5) Save paid survey
+### Expected:
+### - 200 OK
+### - body.ok = true
+### - body.sid should match the sid captured from step 1
+### - body.next = GENERATE_REPORT
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/survey/paid
+Content-Type: application/json
+
+{
+  "schema_version": "paid_survey_v1",
+  "order_id": "{{order_id}}",
+  "report_token": "{{report_token}}",
+  "answers": {
+    "q1": "stable",
+    "q2": "dating_clear",
+    "q3": "once",
+    "q4": "w2_4",
+    "q5": "w1",
+    "q6": "other",
+    "q7": "fight",
+    "q8": "mid",
+    "q9": "mixed",
+    "q10": "pursue_avoid",
+    "q11": "need_time",
+    "q12": "press",
+    "q13": "partial_open",
+    "q14": "small_response",
+    "q15": "once_twice",
+    "q16": "mixed",
+    "q17": "m50_70",
+    "q18": ["sns_stalk", "write_delete"],
+    "q19": ["sleep_appetite", "focus_down"],
+    "q20": "reconcile",
+    "notes": "manual premium flow test"
+  }
+}
+
+### ------------------------------------------------------------
+### 6) Generate preview payload
+### Expected:
+### - 200 OK
+### - body.ok = true
+### - body.prompt exists
+### - body.metrics exists
+### - DB report is not finalized yet in this step
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/generate
+Content-Type: application/json
+
+{
+  "order_id": "{{order_id}}",
+  "report_token": "{{report_token}}"
+}
+
+### ------------------------------------------------------------
+### 7) Finalize premium report
+### Expected:
+### - 200 OK when OPENAI_API_KEY is configured and the LLM call succeeds
+### - body.status = READY
+### - body.saved = true
+### - body.markdown and body.html are not empty
+### - DB reports.status should become READY
+###
+### Failure expectation:
+### - 502 LLM_CALL_FAILED if OPENAI_API_KEY is missing/invalid or network call fails
+### - DB reports.status should become FAILED in that case
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/finalize
+Content-Type: application/json
+
+{
+  "order_id": "{{order_id}}",
+  "report_token": "{{report_token}}",
+  "overwrite": true
+}
+
+### ------------------------------------------------------------
+### 8) Check report status
+### Expected after successful finalize:
+### - 200 OK
+### - body.status = READY
+### - body.has_html = true
+### - body.has_markdown = true
+### ------------------------------------------------------------
+GET {{baseUrl}}/api/premium/report/status?sid={{sid}}&order_id={{order_id}}&report_token={{report_token}}
+
+### ------------------------------------------------------------
+### 9) Rendered report page
+### Expected after successful finalize:
+### - 200 OK
+### - HTML page rendered from reports.html
+###
+### Note:
+### - Current route is /r/{token}
+### - /report?token=... also exists, but /r/{token} is the public short path returned by the premium status meta/report URL pattern
+### ------------------------------------------------------------
+GET {{baseUrl}}/r/{{report_token}}
+
+### ============================================================
+### Failure cases
+### ============================================================
+
+@missing_report_token = t_free_missing_token_for_manual_test
+@missing_order_id = RCL_missing_order_for_manual_test
+@unpaid_order_id = RCL_unpaid_manual_test
+@mismatch_order_id = RCL_mismatch_manual_test
+@ready_reuse_order_id = {{order_id}}
+@ready_reuse_report_token = {{report_token}}
+
+### ------------------------------------------------------------
+### F1) order_id / report_token mismatch
+### Purpose:
+### - verify that premium endpoints reject an order that belongs to a different sid
+### Execution condition:
+### - create another paid order/report pair in DB and set @mismatch_order_id to an order_id that belongs to another sid
+### - keep @ready_reuse_report_token pointing to the successful token from the normal flow
+### Expected status code:
+### - 400
+### Expected response:
+### - detail = REPORT_ORDER_MISMATCH
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/generate
+Content-Type: application/json
+
+{
+  "order_id": "{{mismatch_order_id}}",
+  "report_token": "{{ready_reuse_report_token}}"
+}
+
+### ------------------------------------------------------------
+### F2) NOT_PAID on generate
+### Purpose:
+### - verify payment gate before report generation
+### Execution condition:
+### - create a new order with /api/payments/inicis/prepare and do not run the FORCE PAID SQL
+### - set @unpaid_order_id to that order_id
+### - use a real report_token that matches the same sid as the unpaid order
+### Expected status code:
+### - 403
+### Expected response:
+### - detail = NOT_PAID
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/generate
+Content-Type: application/json
+
+{
+  "order_id": "{{unpaid_order_id}}",
+  "report_token": "{{report_token}}"
+}
+
+### ------------------------------------------------------------
+### F3) NOT_PAID on finalize
+### Purpose:
+### - verify payment gate before final report generation
+### Execution condition:
+### - same as F2
+### Expected status code:
+### - 403
+### Expected response:
+### - detail = NOT_PAID
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/finalize
+Content-Type: application/json
+
+{
+  "order_id": "{{unpaid_order_id}}",
+  "report_token": "{{report_token}}",
+  "overwrite": true
+}
+
+### ------------------------------------------------------------
+### F4) non-existent report_token on generate
+### Purpose:
+### - verify invalid token handling
+### Execution condition:
+### - none
+### Expected status code:
+### - 404
+### Expected response:
+### - detail = INVALID_REPORT_TOKEN
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/generate
+Content-Type: application/json
+
+{
+  "order_id": "{{order_id}}",
+  "report_token": "{{missing_report_token}}"
+}
+
+### ------------------------------------------------------------
+### F5) non-existent report_token on finalize
+### Purpose:
+### - verify invalid token handling on finalize
+### Execution condition:
+### - none
+### Expected status code:
+### - 404
+### Expected response:
+### - detail = INVALID_REPORT_TOKEN
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/finalize
+Content-Type: application/json
+
+{
+  "order_id": "{{order_id}}",
+  "report_token": "{{missing_report_token}}",
+  "overwrite": true
+}
+
+### ------------------------------------------------------------
+### F6) overwrite=false should reuse existing READY report
+### Purpose:
+### - verify reuse path in finalize when html/markdown already exist
+### Execution condition:
+### - normal flow must already have completed successfully
+### - reports.status must already be READY and html/markdown must be non-empty
+### Expected status code:
+### - 200
+### Expected response:
+### - ok = true
+### - saved = false
+### - status = READY
+### - meta.reused_existing = true
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/finalize
+Content-Type: application/json
+
+{
+  "order_id": "{{ready_reuse_order_id}}",
+  "report_token": "{{ready_reuse_report_token}}",
+  "overwrite": false
+}
+
+### ------------------------------------------------------------
+### F7) paid survey missing on generate
+### Purpose:
+### - verify paid survey requirement before preview generation
+### Execution condition:
+### - create a new free survey -> prepare -> FORCE PAID
+### - do not call /api/premium/survey/paid for that sid
+### - set @ready_reuse_report_token and @ready_reuse_order_id to that new pair only for this test, or create separate variables manually
+### Expected status code:
+### - 404
+### Expected response:
+### - detail = PAID_SURVEY_NOT_FOUND
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/generate
+Content-Type: application/json
+
+{
+  "order_id": "{{ready_reuse_order_id}}",
+  "report_token": "{{ready_reuse_report_token}}"
+}
+
+### ------------------------------------------------------------
+### F8) paid survey missing on finalize
+### Purpose:
+### - verify paid survey requirement before final generation
+### Execution condition:
+### - same as F7
+### Expected status code:
+### - 404
+### Expected response:
+### - detail = PAID_SURVEY_NOT_FOUND
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/finalize
+Content-Type: application/json
+
+{
+  "order_id": "{{ready_reuse_order_id}}",
+  "report_token": "{{ready_reuse_report_token}}",
+  "overwrite": true
+}
+
+### ------------------------------------------------------------
+### F9) overwrite=true on an already READY report
+### Purpose:
+### - verify explicit regeneration path on existing READY report
+### Execution condition:
+### - normal flow must already have completed successfully
+### - report must already be READY
+### Expected status code:
+### - 200 on successful LLM call
+### Expected response:
+### - ok = true
+### - saved = true
+### - status = READY
+### - meta.reused_existing should not be present on this path
+### ------------------------------------------------------------
+POST {{baseUrl}}/api/premium/report/finalize
+Content-Type: application/json
+
+{
+  "order_id": "{{order_id}}",
+  "report_token": "{{report_token}}",
+  "overwrite": true
+}
+
+### ------------------------------------------------------------
+### F10) status query when report does not exist
+### Purpose:
+### - verify invalid token handling on status endpoint
+### Execution condition:
+### - none
+### Expected status code:
+### - 404
+### Expected response:
+### - detail = INVALID_REPORT_TOKEN
+### ------------------------------------------------------------
+GET {{baseUrl}}/api/premium/report/status?sid={{sid}}&order_id={{order_id}}&report_token={{missing_report_token}}
+
+### ------------------------------------------------------------
+### F11) status query when order does not exist
+### Purpose:
+### - verify missing order handling on status endpoint
+### Execution condition:
+### - none
+### Expected status code:
+### - 404
+### Expected response:
+### - detail = ORDER_NOT_FOUND
+### ------------------------------------------------------------
+GET {{baseUrl}}/api/premium/report/status?sid={{sid}}&order_id={{missing_order_id}}&report_token={{report_token}}

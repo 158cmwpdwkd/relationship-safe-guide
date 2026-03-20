@@ -1,0 +1,550 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>프리미엄 리포트</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+:root{
+  --bg:#0F1626;
+  --bg2:#1A2540;
+  --card:#222E4A;
+  --text:#F0ECE8;
+  --sub:#9AAABB;
+  --line:rgba(212,145,108,.18);
+  --point:#D4916C;
+  --stable:#4ecdc4;
+  --caution:#ffb347;
+  --warning:#d4916c;
+  --danger:#ff6b6b;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Noto Sans KR',sans-serif;
+  line-height:1.75;
+}
+.wrap{
+  max-width:820px;
+  margin:0 auto;
+  padding:28px 18px 56px;
+}
+.hero{
+  background:linear-gradient(180deg, rgba(212,145,108,.14), rgba(212,145,108,.05));
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:20px 20px 18px;
+  margin-bottom:16px;
+}
+.hero-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:8px;
+}
+.hero-title-wrap{
+  min-width:0;
+}
+.hero-title-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:6px;
+}
+.hero-icon{
+  width:28px;
+  height:28px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(212,145,108,.14);
+  border:1px solid var(--line);
+  color:var(--point);
+  font-size:14px;
+  flex:none;
+}
+.hero-title{
+  font-size:20px;
+  font-weight:800;
+  line-height:1.3;
+  color:#fff;
+}
+.hero-meta{
+  color:var(--sub);
+  font-size:13px;
+  letter-spacing:.02em;
+}
+.hero-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:7px 12px;
+  border-radius:999px;
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--line);
+  color:#fff;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.08em;
+  white-space:nowrap;
+}
+h1{
+  margin:0 0 6px;
+  font-size:28px;
+  line-height:1.35;
+}
+.lead{
+  color:var(--sub);
+  font-size:15px;
+}
+.metrics-panel{
+  margin:0 0 16px;
+}
+.metrics-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+  margin:0 0 12px;
+}
+.metric-card{
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:16px;
+  min-height:132px;
+  box-shadow:0 10px 30px rgba(0,0,0,.14);
+}
+.metric-card[data-tone="stable"]{
+  border-color:rgba(78,205,196,.22);
+}
+.metric-card[data-tone="caution"]{
+  border-color:rgba(255,179,71,.22);
+}
+.metric-card[data-tone="warning"]{
+  border-color:rgba(212,145,108,.24);
+}
+.metric-card[data-tone="danger"]{
+  border-color:rgba(255,107,107,.24);
+}
+.metric-title{
+  font-size:13px;
+  font-weight:700;
+  color:var(--sub);
+  margin-bottom:14px;
+}
+.metric-value-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.metric-value{
+  font-size:22px;
+  font-weight:800;
+  line-height:1.25;
+  color:#fff;
+}
+.metric-score{
+  font-size:26px;
+  font-weight:800;
+  line-height:1;
+  color:#fff;
+  flex:none;
+}
+.metric-summary{
+  font-size:12px;
+  line-height:1.55;
+  color:var(--sub);
+}
+.bars{
+  display:grid;
+  gap:10px;
+}
+.metric-bar{
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:16px 16px 14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.12);
+}
+.metric-bar[data-tone="stable"]{
+  border-color:rgba(78,205,196,.20);
+}
+.metric-bar[data-tone="caution"]{
+  border-color:rgba(255,179,71,.20);
+}
+.metric-bar[data-tone="warning"]{
+  border-color:rgba(212,145,108,.22);
+}
+.metric-bar[data-tone="danger"]{
+  border-color:rgba(255,107,107,.22);
+}
+.metric-bar-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:10px;
+}
+.metric-bar-copy{
+  min-width:0;
+}
+.metric-bar-title{
+  font-size:14px;
+  font-weight:700;
+  color:#fff;
+  margin-bottom:4px;
+}
+.metric-bar-state{
+  font-size:12px;
+  color:var(--sub);
+  line-height:1.45;
+}
+.metric-bar-score{
+  font-size:22px;
+  font-weight:800;
+  color:#fff;
+  line-height:1;
+  flex:none;
+}
+.metric-bar-track{
+  width:100%;
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.07);
+  overflow:hidden;
+}
+.metric-bar-fill{
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(255,255,255,.18), var(--fill, var(--point)));
+}
+.metric-bar[data-tone="stable"] .metric-bar-fill{
+  --fill:var(--stable);
+}
+.metric-bar[data-tone="caution"] .metric-bar-fill{
+  --fill:var(--caution);
+}
+.metric-bar[data-tone="warning"] .metric-bar-fill{
+  --fill:var(--warning);
+}
+.metric-bar[data-tone="danger"] .metric-bar-fill{
+  --fill:var(--danger);
+}
+.content{
+  background:var(--bg2);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:22px 20px;
+}
+.content h1{
+  font-size:24px;
+  margin:0 0 16px;
+}
+.content h2{
+  font-size:20px;
+  margin:28px 0 10px;
+  padding-top:4px;
+  border-top:1px solid var(--line);
+}
+.content h3{
+  font-size:17px;
+  margin:18px 0 8px;
+}
+.content p{
+  margin:0 0 12px;
+  color:var(--text);
+}
+.content ul,
+.content ol{
+  margin:0 0 14px 20px;
+  padding:0;
+}
+.content li{
+  margin:0 0 8px;
+}
+.content strong{
+  color:#fff;
+}
+.content blockquote{
+  margin:14px 0;
+  padding:12px 14px;
+  border-left:4px solid var(--point);
+  background:rgba(255,255,255,.03);
+  border-radius:10px;
+}
+.content hr{
+  border:none;
+  border-top:1px solid var(--line);
+  margin:24px 0;
+}
+.section{
+  margin-top:16px;
+  border-radius:18px;
+  padding:20px;
+  border:1px solid var(--line);
+}
+.s-teal{
+  background:linear-gradient(180deg, rgba(78,205,196,.12), rgba(78,205,196,.05));
+  border-color:rgba(78,205,196,.20);
+}
+.tag{
+  display:inline-block;
+  font-size:12px;
+  letter-spacing:.08em;
+  color:#8fe0d8;
+  border:1px solid rgba(143,224,216,.24);
+  border-radius:999px;
+  padding:4px 10px;
+  margin-bottom:10px;
+}
+.sec-title{
+  margin:0 0 14px;
+  font-size:22px;
+  line-height:1.35;
+  color:#fff;
+}
+.contact-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+}
+.contact-card{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:16px;
+}
+.c-num{
+  margin-bottom:10px;
+}
+.c-phone{
+  display:inline-block;
+  font-size:26px;
+  font-weight:800;
+  line-height:1;
+  color:#fff;
+}
+.c-label{
+  font-size:14px;
+  line-height:1.6;
+  color:var(--sub);
+}
+.footer{
+  margin-top:16px;
+  color:var(--sub);
+  font-size:13px;
+  text-align:center;
+}
+@media (max-width: 680px){
+  .hero-top{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .metrics-grid{
+    grid-template-columns:1fr;
+  }
+  .metric-card{
+    min-height:auto;
+  }
+  .metric-bar-head{
+    align-items:flex-end;
+  }
+  .contact-grid{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-top">
+        <div class="hero-title-wrap">
+          <div class="hero-title-row">
+            <div class="hero-icon">?</div>
+            <div class="hero-title">관계 진단 리포트</div>
+          </div>
+          <div class="hero-meta">분석 완료 &nbsp;&nbsp; 리커넥트랩</div>
+        </div>
+        <div class="hero-badge">프리미엄</div>
+      </div>
+      <div class="lead">
+        관계 해석보다 행동 안정화와 리스크 관리에 초점을 둔 개인 맞춤 가이드
+      </div>
+    </section>
+
+    
+    <section class="metrics-panel">
+      <section class="metrics-grid">
+        
+      <section class="metric-card" data-tone="caution" data-metric-id="relationship_distance">
+        <div class="metric-title">?? 관계 거리감</div>
+        <div class="metric-value-row">
+          <div class="metric-value">?? 벌어짐</div>
+          <div class="metric-score">58</div>
+        </div>
+        <div class="metric-summary">현재 관계가 얼마나 멀어진 상태로 보이는지 정리한 지표입니다.</div>
+      </section>
+      <section class="metric-card" data-tone="caution" data-metric-id="emotional_temperature">
+        <div class="metric-title">?? 감정 온도</div>
+        <div class="metric-value-row">
+          <div class="metric-value">?? 불안정함</div>
+          <div class="metric-score">47</div>
+        </div>
+        <div class="metric-summary">현재 상태의 감정 강도와 흔들림을 보여주는 지표입니다.</div>
+      </section>
+      <section class="metric-card" data-tone="warning" data-metric-id="contact_timing">
+        <div class="metric-title">? 연락 타이밍</div>
+        <div class="metric-value-row">
+          <div class="metric-value">? 기다리며 재평가</div>
+          <div class="metric-score">43</div>
+        </div>
+        <div class="metric-summary">어떤 접근이든 시도하기 전에 어느 정도의 시간 간격과 자제가 필요한지 보여주는 지표입니다.</div>
+      </section>
+      <section class="metric-card" data-tone="caution" data-metric-id="current_risk_signal">
+        <div class="metric-title">?? 현재 위험 신호</div>
+        <div class="metric-value-row">
+          <div class="metric-value">?? 주의 필요</div>
+          <div class="metric-score">58</div>
+        </div>
+        <div class="metric-summary">현재 위험 패턴을 안전 우선 관점에서 해석한 결과입니다.</div>
+      </section>
+      </section>
+      <section class="bars">
+        
+      <section class="metric-bar" data-tone="caution" data-metric-id="recovery_conditions">
+        <div class="metric-bar-head">
+          <div class="metric-bar-copy">
+            <div class="metric-bar-title">관계 회복 가능성 지수</div>
+            <div class="metric-bar-state">?? 매우 제한적</div>
+          </div>
+          <div class="metric-bar-score">42</div>
+        </div>
+        <div class="metric-bar-track" aria-hidden="true">
+          <div class="metric-bar-fill" style="width:42%; --fill:#ffb347;"></div>
+        </div>
+      </section>
+      <section class="metric-bar" data-tone="caution" data-metric-id="emotional_stability">
+        <div class="metric-bar-head">
+          <div class="metric-bar-copy">
+            <div class="metric-bar-title">현재 감정 안정도</div>
+            <div class="metric-bar-state">?? 흔들리는 상태</div>
+          </div>
+          <div class="metric-bar-score">49</div>
+        </div>
+        <div class="metric-bar-track" aria-hidden="true">
+          <div class="metric-bar-fill" style="width:49%; --fill:#ffb347;"></div>
+        </div>
+      </section>
+      </section>
+    </section>
+
+    <main class="content">
+      <h1>리커넥트랩 프리미엄 리포트</h1>
+<h2>1. 현재 상태 정밀 진단</h2>
+<p>현재 관계는 종료 강도가 매우 높게 형성되어 있으면서도, 상대방의 개방성 신호가 동시에 높게 나타나는 복합적인 국면입니다. 이러한 신호 혼재는 관계가 완전히 닫힌 상태임을 의미하는 한편, 일부 상호작용 단서가 남아 있어 사용자가 이를 관계 회복의 근거로 오판할 위험을 높입니다. 즉, 상대의 일부 반응이 ‘열림’으로 읽힐 수 있으나, 이는 관계 종료 의사를 완전히 뒤집는 신호로 보기는 어렵습니다.</p>
+<p>사용자의 정서 상태는 감정적 동요와 충동성이 비교적 높은 편이며, 이로 인해 확인행동 및 충동적 연락 시도가 발생할 가능성이 큽니다. 현재 즉각적인 행동보다는 신중한 지연과 자기조절이 요구되는 상태입니다. 특히, 관계의 기초가 약하고 안정화 우선순위가 중간 수준임을 고려할 때, 감정적 판단에 따른 행동은 관계 악화 또는 법적·안전 문제로 이어질 수 있습니다.</p>
+<p>따라서 지금 가장 큰 문제는 일부 남아 있는 신호를 희망 근거로 과대해석하거나, 충동적으로 재접촉을 시도해 관계를 더 악화시키는 것입니다. 안전 상태는 ‘주의가 필요한 상태’로, 충동적 판단과 행동을 억제하는 보수적 접근이 필수적입니다.</p>
+<h2>2. 72시간 행동 가이드</h2>
+<h3>오늘 바로 멈출 것</h3>
+<ul>
+<li>상대방과 직접적 연락 시도(문자, 전화, SNS 메시지 등)를 즉시 중단한다.</li>
+<li>상대방의 SNS나 주변인 계정 확인을 반복하는 행동을 제한한다. 하루 3회 이하로 횟수를 제한하고, 확인 후 즉시 기록하며 추가 확인을 자제한다.</li>
+<li>충동적으로 메시지를 작성하거나 전송하려는 행동을 발견하면 즉시 멈추고 30분 이상 감정 상태를 점검한다.</li>
+</ul>
+<h3>3일 안에 회복할 것</h3>
+<ul>
+<li>연락 충동이 생길 때마다 충동 일지를 작성해 충동 발생 원인과 감정 변화를 기록한다.</li>
+<li>확인행동을 줄이기 위해 스마트폰 알림 설정을 최소화하고, SNS 앱 자동 로그인 기능을 해제한다.</li>
+<li>주변 신뢰할 수 있는 사람에게 현재 감정 상태를 공유하고, 충동적 행동을 억제하도록 도움을 요청한다.</li>
+<li>하루 1회 이상 명확한 생활 루틴(식사, 수면, 간단한 운동)을 유지해 감정 불안정을 완화한다.</li>
+</ul>
+<h2>3. 개인 위험 행동 3가지</h2>
+<p>1) <strong>충동적 재접촉 시도</strong><br />
+- 현재 관계 종료 신호가 강한 상태에서 충동적으로 연락을 시도하면 상대에게 부담과 불편을 줄 수 있습니다.<br />
+- 법적 문제(스토킹 처벌법 위반 등)로 연결될 위험이 크며, 관계 회복 가능성 판단을 흐리게 만듭니다.<br />
+- 대신, 연락 충동이 일어날 때마다 30분 이상 기다리고, 충동 일지에 기록하며 반복 행동을 줄이는 데 집중해야 합니다.</p>
+<p>2) <strong>상대방 SNS 반복 확인</strong><br />
+- SNS 확인은 상대의 상태를 과도하게 추적하는 행동으로, 감정적 동요를 키우고 충동적 연락 시도를 유발할 수 있습니다.<br />
+- 반복 확인은 자기조절 실패로 이어져 정서적 불안과 법적 문제 위험을 높입니다.<br />
+- 대신, SNS 확인 횟수를 하루 3회 이하로 제한하고, 확인 후 즉시 기록하며 추가 확인을 자제해야 합니다.</p>
+<p>3) <strong>우회접촉 시도(지인 통한 연락 등)</strong><br />
+- 직접 연락이 어려운 상황에서 지인을 통한 간접 연락 시도는 상대방의 의사와 안전을 침해할 수 있습니다.<br />
+- 이는 관계 악화뿐 아니라 법적 문제로도 발전할 수 있으므로 절대 삼가야 합니다.<br />
+- 대신, 현재는 모든 우회접촉을 중단하고, 자신의 감정과 행동을 정리하는 데 집중해야 합니다.</p>
+<h2>4. 14일 감정 안정화 플랜</h2>
+<h3>1주차</h3>
+<ul>
+<li><strong>확인행동 제한</strong>: SNS 및 연락 확인 횟수를 엄격히 제한하고, 충동 발생 시 즉시 기록한다.  </li>
+<li><strong>생활 루틴 유지</strong>: 규칙적인 식사와 수면 시간을 지키고, 가벼운 신체 활동을 매일 20분 이상 실시한다.  </li>
+<li><strong>감정 기록</strong>: 매일 감정 상태와 충동 발생 상황을 일지에 기록해 패턴을 파악한다.  </li>
+<li><strong>사회적 지원 요청</strong>: 신뢰할 수 있는 주변인과 정기적으로 연락하며 감정 조절 지원을 받는다.</li>
+</ul>
+<h3>2주차</h3>
+<ul>
+<li><strong>충동 지연 훈련</strong>: 연락 충동 발생 시 최소 1시간 이상 기다리는 훈련을 반복한다.  </li>
+<li><strong>사고 정리 시간 확보</strong>: 하루 15분 이상 조용한 시간을 마련해 현재 상황과 감정을 객관적으로 점검한다.  </li>
+<li><strong>대체 활동 개발</strong>: 충동이 일어날 때 집중할 수 있는 취미나 작업을 준비해 행동 전환을 시도한다.  </li>
+<li><strong>전문가 상담 고려</strong>: 감정 조절이 어렵거나 일상생활에 지장이 크면 전문가 도움을 검토한다.</li>
+</ul>
+<h2>5. 재접촉 안전 기준</h2>
+<p>재접촉을 고려하기 전에 반드시 다음 조건을 점검해야 하며, 하나라도 충족하지 못하면 접촉 시도를 미루는 것이 안전합니다.</p>
+<ul>
+<li>상대방이 명확히 연락 거부 의사를 표현하지 않았는가?  </li>
+<li>현재 차단 상태가 아니며, 연락 시도가 법적 문제로 이어질 위험이 없는가?  </li>
+<li>사용자의 감정 상태가 충동적이지 않고, 연락 충동을 충분히 지연시킨 후 판단하는가?  </li>
+<li>최근 14일간 확인행동과 충동 연락 시도를 제한하며, 감정 안정화가 어느 정도 이루어졌는가?  </li>
+<li>주변 신뢰인 또는 전문가와 상담을 통해 재접촉 판단에 객관성을 확보했는가?</li>
+</ul>
+<p>이 조건을 충족하지 않은 상태에서의 재접촉 시도는 관계 악화와 법적 문제 위험을 높이므로 반드시 보류해야 합니다.</p>
+<h2>6. 전문가 도움 안내</h2>
+<p>다음과 같은 상황에서는 혼자 감당하기보다 전문가나 상담기관의 도움을 받는 것이 안전합니다.</p>
+<ul>
+<li>감정 조절이 반복적으로 실패하여 충동적 연락이나 확인행동이 지속될 때  </li>
+<li>불면증, 식사 장애 등 신체 건강에 영향을 주는 정서 불안 증상이 나타날 때  </li>
+<li>일상생활 기능이 저하되어 직장, 학업, 대인관계에 지장이 생길 때  </li>
+<li>반복되는 불안과 우울 증상으로 인해 사고가 극단적으로 흐르거나 자해 충동이 있을 때  </li>
+<li>주변 도움 요청이 필요하다고 판단되나 혼자 대처가 어려운 위기 상황일 때</li>
+</ul>
+<p>이럴 경우, 정신건강 전문의, 심리상담센터, 또는 긴급지원기관에 연락하여 안전 확보와 정서 안정에 우선 집중해야 합니다.</p>
+<hr />
+<ul>
+<li><strong>안전 메모</strong>: 현재는 감정 충동과 관계 신호 혼재로 인해 작은 반응을 과대해석하기 쉽습니다. 모든 행동은 충분한 시간 지연과 객관적 점검 후에 진행해야 합니다.</li>
+</ul>
+    </main>
+<div class="section s-teal">
+  <span class="tag">07  도움 받을 곳</span>
+  <h2 class="sec-title">혼자 버티기 힘들 때</h2>
+  <div class="contact-grid">
+    <div class="contact-card">
+      <div class="c-num">
+        <span class="c-phone">?? 117</span>
+      </div>
+      <div class="c-label">스토킹 피해<br>상담전화</div>
+    </div>
+    <div class="contact-card">
+      <div class="c-num">
+        <span class="c-phone">?? 1577-0199</span>
+      </div>
+      <div class="c-label">정신건강<br>위기상담전화</div>
+    </div>
+  </div>
+</div>
+
+    <div class="footer">
+      본 리포트는 감정 자극이 아니라 안전 중심의 행동 가이드를 목적으로 제공합니다.
+    </div>
+  </div>
+</body>
+</html>

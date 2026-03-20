@@ -125,7 +125,7 @@ def seed_ready_data():
             expires_at=now,
         )
         db.add(rep)
-
+ 
         order = Order(
             order_id=order_id,
             sid=sid,
@@ -151,10 +151,9 @@ def seed_ready_data():
 
 def test_finalize_premium_report_success(monkeypatch):
     sid, token, order_id = seed_ready_data()
-
     monkeypatch.setattr(
         "app.routes_premium.generate_premium_markdown",
-        lambda prompt: "# 1. 현재 상태 정밀 진단\n\n테스트 마크다운 본문",
+        lambda prompt: "# 1. Current state\n\nTest markdown body",
     )
 
     payload = {
@@ -171,15 +170,19 @@ def test_finalize_premium_report_success(monkeypatch):
     assert body["sid"] == sid
     assert body["saved"] is True
     assert body["status"] == "READY"
-    assert "현재 상태 정밀 진단" in body["markdown"]
+    assert "Current state" in body["markdown"]
+    assert isinstance(body["metrics"], dict)
+    assert len(body["metrics"]["cards"]) == 6
     assert "<html" in body["html"].lower()
+    assert "metrics-grid" in body["html"]
+    assert 'data-metric-id="relationship_distance"' in body["html"]
 
     db = TestingSessionLocal()
     try:
         rep = db.query(Report).filter(Report.sid == sid).first()
         assert rep is not None
         assert rep.status == "READY"
-        assert "현재 상태 정밀 진단" in rep.markdown
+        assert "Current state" in rep.markdown
         assert "<html" in rep.html.lower()
         assert rep.generated_at is not None
     finally:
@@ -261,6 +264,8 @@ def test_finalize_premium_report_no_overwrite(monkeypatch):
     assert body["ok"] is True
     assert body["saved"] is False
     assert body["status"] == "READY"
+    assert isinstance(body["metrics"], dict)
+    assert len(body["metrics"]["cards"]) == 6
     assert body["markdown"] == "EXISTING_MD"
     assert body["html"] == "<html><body>EXISTING_HTML</body></html>"
     assert body["meta"]["reused_existing"] is True
@@ -272,7 +277,7 @@ def test_finalize_premium_report_without_sid_success(monkeypatch):
 
     monkeypatch.setattr(
         "app.routes_premium.generate_premium_markdown",
-        lambda prompt: "# 1. 현재 상태 정밀 진단\n\n테스트 마크다운 본문",
+        lambda prompt: "# 1. Current state\n\nTest markdown body",
     )
 
     payload = {

@@ -45,6 +45,7 @@ class PremiumReportGenerateOut(BaseModel):
     sid: str
     prompt: str
     interpretation_result: Dict[str, Any]
+    metrics: Dict[str, Any]
     meta: Dict[str, Any]
 
 
@@ -62,6 +63,7 @@ class PremiumReportFinalizeOut(BaseModel):
     status: str
     prompt: str
     interpretation_result: Dict[str, Any]
+    metrics: Dict[str, Any]
     markdown: str
     html: str
     meta: Dict[str, Any]

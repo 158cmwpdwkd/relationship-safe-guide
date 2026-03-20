@@ -166,7 +166,11 @@ def test_generate_premium_report_payload_success():
     assert body["sid"] == sid
     assert body["prompt"]
     assert isinstance(body["interpretation_result"], dict)
+    assert isinstance(body["metrics"], dict)
+    assert body["metrics"]["version"] == "v1"
+    assert len(body["metrics"]["cards"]) == 6
     assert isinstance(body["meta"], dict)
+    assert body["meta"]["metrics_version"] == "v1"
 
 
 def test_generate_premium_report_payload_without_paid_survey():

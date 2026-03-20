@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="816" height="1056" viewBox="0 0 816 1056">
+  <defs>
+    <style>
+      .bg { fill: #f5f7fb; }
+      .panel { fill: #ffffff; stroke: #d9e2f2; stroke-width: 1; }
+      .titlebar { fill: #17324d; }
+      .accent { fill: #2a6f97; }
+      .muted { fill: #5f6b7a; }
+      .title { font: 700 28px 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif; fill: #ffffff; }
+      .subtitle { font: 400 12px 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif; fill: #d8e6f3; }
+      .h { font: 700 15px 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif; fill: #17324d; }
+      .body { font: 400 11px 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif; fill: #1f2933; }
+      .small { font: 400 10px 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif; fill: #51606f; }
+      .mono { font: 400 9.5px 'Courier New', monospace; fill: #17324d; }
+      .bullet { font: 700 11px 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif; fill: #2a6f97; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="816" height="1056"/>
+  <rect class="titlebar" x="32" y="28" width="752" height="92" rx="18"/>
+  <text class="title" x="56" y="68">Relationship Safe Guide</text>
+  <text class="subtitle" x="56" y="92">코드 저장소 근거만으로 정리한 1페이지 앱 요약</text>
+  <text class="subtitle" x="56" y="110">설문, 결제, 프리미엄 리포트 흐름을 가진 FastAPI 앱</text>
+
+  <rect class="panel" x="32" y="144" width="360" height="128" rx="14"/>
+  <rect class="accent" x="32" y="144" width="8" height="128" rx="4"/>
+  <text class="h" x="56" y="170">무엇인가</text>
+  <text class="body" x="56" y="194">
+    <tspan x="56" dy="0">무료 관계 위험도 설문을 받고, 긴급도와 레드 플래그를 계산한 뒤</tspan>
+    <tspan x="56" dy="18">토큰 기반 HTML 리포트를 제공하는 FastAPI 앱입니다.</tspan>
+    <tspan x="56" dy="18">여기에 결제, 심화 설문, OpenAI 기반 프리미엄 리포트 생성 흐름이</tspan>
+    <tspan x="56" dy="18">추가되어 있습니다.</tspan>
+  </text>
+
+  <rect class="panel" x="32" y="288" width="360" height="110" rx="14"/>
+  <rect class="accent" x="32" y="288" width="8" height="110" rx="4"/>
+  <text class="h" x="56" y="314">누구를 위한가</text>
+  <text class="body" x="56" y="338">
+    <tspan x="56" dy="0">불안정한 관계 상황에서 다시 연락할지, 어떻게 대응할지에 대해</tspan>
+    <tspan x="56" dy="18">안전 중심의 가이드를 원하는 사용자가 주요 대상입니다.</tspan>
+    <tspan x="56" dy="18">이 해석은 설문 문항, 레드 플래그 체크, 프리미엄 프롬프트를</tspan>
+    <tspan x="56" dy="18">근거로 했습니다.</tspan>
+  </text>
+
+  <rect class="panel" x="32" y="414" width="360" height="352" rx="14"/>
+  <rect class="accent" x="32" y="414" width="8" height="352" rx="4"/>
+  <text class="h" x="56" y="440">무엇을 하는가</text>
+
+  <text class="bullet" x="56" y="468">•</text>
+  <text class="body" x="74" y="468">무료 설문을 받고, 동의 여부와 필수 응답 항목을 검증합니다.</text>
+
+  <text class="bullet" x="56" y="502">•</text>
+  <text class="body" x="74" y="502">충동성 점수와 레드 플래그를 바탕으로 위험 수준을 분류합니다.</text>
+
+  <text class="bullet" x="56" y="536">•</text>
+  <text class="body" x="74" y="536">세션과 리포트 토큰을 만들고, 조회용 리포트 URL을 반환합니다.</text>
+
+  <text class="bullet" x="56" y="570">•</text>
+  <text class="body" x="74" y="570">주문, 유료 설문, 리포트, 메시지 스케줄 데이터를 DB에 저장합니다.</text>
+
+  <text class="bullet" x="56" y="604">•</text>
+  <text class="body" x="74" y="604">이니시스 결제 폼을 만들고, 리턴, 실패, 가상계좌 알림을 처리합니다.</text>
+
+  <text class="bullet" x="56" y="638">•</text>
+  <text class="body" x="74" y="638">유료 접근 권한을 확인한 뒤 프리미엄 설문과 리포트 API를 노출합니다.</text>
+
+  <text class="bullet" x="56" y="672">•</text>
+  <text class="body" x="74" y="672">해석 파이프라인과 OpenAI 호출을 거쳐 프리미엄 HTML 리포트를 만듭니다.</text>
+
+  <rect class="panel" x="32" y="782" width="360" height="242" rx="14"/>
+  <rect class="accent" x="32" y="782" width="8" height="242" rx="4"/>
+  <text class="h" x="56" y="808">실행 방법</text>
+  <text class="body" x="56" y="832">
+    <tspan x="56" dy="0">1. 의존성 설치:</tspan>
+    <tspan class="mono" x="72" dy="18">pip install -r requirements.txt</tspan>
+    <tspan class="body" x="56" dy="24">2. 환경 변수 설정:</tspan>
+    <tspan class="mono" x="72" dy="18">DATABASE_URL, OPENAI_API_KEY</tspan>
+    <tspan class="body" x="72" dy="18">결제 흐름에는 INICIS_MID, INICIS_SIGN_KEY도 사용됩니다.</tspan>
+    <tspan class="body" x="56" dy="24">3. API 실행:</tspan>
+    <tspan class="mono" x="72" dy="18">uvicorn app.main:app --reload</tspan>
+    <tspan class="body" x="56" dy="24">4. 필요한 로컬 라우트를 엽니다.</tspan>
+    <tspan class="body" x="72" dy="18">별도 시작 가이드 / .env 예시: 저장소에서 찾지 못함.</tspan>
+  </text>
+
+  <rect class="panel" x="424" y="144" width="360" height="532" rx="14"/>
+  <rect class="accent" x="424" y="144" width="8" height="532" rx="4"/>
+  <text class="h" x="448" y="170">어떻게 동작하는가</text>
+  <text class="body" x="448" y="198">
+    <tspan x="448" dy="0">저장소 근거 기준의 구성 요소와 데이터 흐름:</tspan>
+  </text>
+
+  <text class="bullet" x="448" y="230">•</text>
+  <text class="body" x="466" y="230">엔트리포인트: <tspan class="mono">app/main.py</tspan> 가 FastAPI 앱, CORS,</text>
+  <text class="body" x="466" y="248">SQLAlchemy 테이블 생성, asyncpg 풀 초기화를 담당합니다.</text>
+
+  <text class="bullet" x="448" y="286">•</text>
+  <text class="body" x="466" y="286">영속 계층: <tspan class="mono">app/db.py</tspan> 가 DB 연결을 구성하고,</text>
+  <text class="body" x="466" y="304"><tspan class="mono">app/models.py</tspan> 가 <tspan class="mono">UserSession</tspan>, <tspan class="mono">Order</tspan>, <tspan class="mono">PaidSurvey</tspan>,</text>
+  <text class="body" x="466" y="322"><tspan class="mono">Report</tspan>, <tspan class="mono">MessageSchedule</tspan> 모델을 정의합니다.</text>
+
+  <text class="bullet" x="448" y="360">•</text>
+  <text class="body" x="466" y="360">무료 흐름: <tspan class="mono">routes_survey.py</tspan> 가 설문 입력을 검증하고,</text>
+  <text class="body" x="466" y="378"><tspan class="mono">compute_risk()</tspan> 를 호출해 세션과 리포트를 저장한 뒤</text>
+  <text class="body" x="466" y="396">리포트 URL을 반환합니다.</text>
+
+  <text class="bullet" x="448" y="434">•</text>
+  <text class="body" x="466" y="434">리포트 제공: <tspan class="mono">routes_report.py</tspan> 가 토큰으로 리포트와 세션을</text>
+  <text class="body" x="466" y="452">불러옵니다. 프리미엄 HTML 이 READY 상태면 그것을 반환하고,</text>
+  <text class="body" x="466" y="470">아니면 <tspan class="mono">app/report.py</tspan> 의 무료 리포트 HTML 로 대체합니다.</text>
+
+  <text class="bullet" x="448" y="508">•</text>
+  <text class="body" x="466" y="508">결제: <tspan class="mono">routes_payments.py</tspan> 가 주문 ID 생성, 서명 생성,</text>
+  <text class="body" x="466" y="526">이니시스 결제 페이지 렌더링, 리턴 검증, 주문 상태 갱신을 처리합니다.</text>
+
+  <text class="bullet" x="448" y="564">•</text>
+  <text class="body" x="466" y="564">프리미엄 흐름: <tspan class="mono">routes_premium.py</tspan> 가 유료 권한 확인,</text>
+  <text class="body" x="466" y="582">유료 설문 저장, 엔진 입력 생성, 프롬프트 준비, markdown/html 확정,</text>
+  <text class="body" x="466" y="600">최종 프리미엄 리포트 저장을 담당합니다.</text>
+
+  <text class="bullet" x="448" y="638">•</text>
+  <text class="body" x="466" y="638">서비스 계층: <tspan class="mono">app/services/interpretation</tspan> 이 해석을 계산하고,</text>
+  <text class="body" x="466" y="656"><tspan class="mono">premium_pipeline.py</tspan> 가 프롬프트를 만들며, <tspan class="mono">llm_client.py</tspan> 가</text>
+  <text class="body" x="466" y="674">OpenAI 를 호출하고, <tspan class="mono">premium_renderer.py</tspan> 가 HTML 로 변환합니다.</text>
+
+  <rect class="panel" x="424" y="692" width="360" height="332" rx="14"/>
+  <rect class="accent" x="424" y="692" width="8" height="332" rx="4"/>
+  <text class="h" x="448" y="718">근거 및 누락 정보</text>
+  <text class="small" x="448" y="744">
+    <tspan x="448" dy="0">참고한 파일: app/main.py, app/db.py, app/models.py, app/risk.py,</tspan>
+    <tspan x="448" dy="17">app/routes_survey.py, app/routes_report.py, app/routes_payments.py,</tspan>
+    <tspan x="448" dy="17">app/routes_premium.py, app/services/reporting/*.py, API 테스트들.</tspan>
+    <tspan x="448" dy="28">저장소에서 찾지 못한 정보:</tspan>
+    <tspan x="464" dy="17">• README 또는 명시적인 시작 가이드</tspan>
+    <tspan x="464" dy="17">• 필수 런타임 변수가 정리된 .env 예시</tspan>
+    <tspan x="464" dy="17">• 별도 프론트엔드 앱 소스나 UI 실행 안내</tspan>
+    <tspan x="448" dy="28">그래서 실행 방법은 엔트리포인트에서 직접 확인되는 최소 명령만 적었습니다.</tspan>
+  </text>
+</svg>

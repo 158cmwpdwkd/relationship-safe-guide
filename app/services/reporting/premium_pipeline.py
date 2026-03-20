@@ -6,6 +6,7 @@ from typing import Any, Dict, Mapping
 
 from app.services.interpretation.engine import run_interpretation_engine
 from app.services.interpretation.premium_report import build_premium_report_prompt
+from app.services.reporting.premium_metrics import build_premium_metrics
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
@@ -31,12 +32,15 @@ def prepare_premium_report_payload(engine_input: Any) -> Dict[str, Any]:
     """
     interpretation_result = run_interpretation_engine(engine_input)
     prompt = build_premium_report_prompt(interpretation_result)
+    metrics = build_premium_metrics(interpretation_result)
 
     return {
         "interpretation_result": _as_dict(interpretation_result),
+        "metrics": metrics,
         "prompt": prompt,
         "meta": {
             "report_type": "premium",
             "prompt_version": "v1",
+            "metrics_version": metrics["version"],
         },
     }
