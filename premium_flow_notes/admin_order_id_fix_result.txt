@@ -1,3 +1,59 @@
+1. admin 관련 파일 목록
+- app/routes_admin.py
+- templates/admin.html
+- templates/session_detail.html
+- app/models.py
+
+2. admin 목록 페이지를 렌더링하는 실제 라우트 파일명/함수명
+- 파일명: app/routes_admin.py
+- 함수명: admin_home
+- 경로: GET /_admin
+
+3. 현재 sessions 데이터의 조회 방식 요약
+- admin_home은 asyncpg pool로 raw SQL을 실행한다.
+- 기존 조회 SQL은 user_sessions u
+  LEFT JOIN reports r ON u.sid = r.sid
+  만 사용했다.
+- 템플릿에는 sessions = [dict(r) for r in rows] 로 전달한다.
+- 즉, 템플릿의 각 row는 SQL SELECT에 포함된 컬럼만 접근 가능하다.
+
+4. order_id가 안 뜨는 원인 분석
+- templates/admin.html에는 이미 {{ s.order_id }} 컬럼이 들어 있었다.
+- 하지만 admin_home의 SELECT 문에는 o.order_id 또는 orders 조인이 없었다.
+- 따라서 sessions 각 row dict 안에 order_id 키가 생성되지 않았다.
+- 결과적으로 템플릿에서 {{ s.order_id }} 는 비어 보이거나 표시되지 않았다.
+
+5. 실제로 어느 모델/테이블에 order_id가 있는지
+- 실제 코드 기준 모델: app/models.py
+- 모델: Order
+- 테이블: orders
+- 컬럼: order_id
+- 관계 기준:
+  - Order.sid -> user_sessions.sid
+  - Report.sid -> user_sessions.sid
+- 즉 admin 목록에서 order_id를 보이게 하려면 orders 테이블을 sid 기준으로 조인해야 한다.
+
+6. 수정해야 할 파일 목록
+- app/routes_admin.py
+- templates/session_detail.html
+
+7. 각 파일에서 무엇을 어떻게 바꿨는지 요약
+
+- app/routes_admin.py
+  - admin_home의 목록 조회 SQL에 LEFT JOIN orders o ON u.sid = o.sid 추가
+  - SELECT 절에 o.order_id 추가
+  - status는 COALESCE(r.status, o.status) AS status 로 유지 보강
+  - session_detail에서 orders 조회 추가
+  - session_detail 템플릿 컨텍스트에 order 추가
+
+- templates/session_detail.html
+  - 기존 파일이 비어 있었음
+  - session / order / report를 각각 표 형태로 렌더링하도록 작성
+  - 상세 페이지에서 order_id 포함 order 전체 필드를 확인 가능하게 함
+
+8. admin 라우트 파일의 최종 수정 코드 전체
+
+```python
 import os
 import asyncpg
 import secrets
@@ -30,7 +86,6 @@ async def get_pool(request: Request) -> asyncpg.Pool:
     return pool
 
 
-# 관리자 홈
 @router.get("", response_class=HTMLResponse)
 async def admin_home(
     request: Request,
@@ -69,7 +124,6 @@ async def admin_home(
     )
 
 
-# 세션 상세
 @router.get("/session/{sid}", response_class=HTMLResponse)
 async def session_detail(
     request: Request,
@@ -111,7 +165,6 @@ async def session_detail(
     )
 
 
-# 최근 1시간 세션 삭제
 @router.post("/delete_recent_hour")
 async def delete_recent_hour(
     _: HTTPBasicCredentials = Depends(require_admin),
@@ -119,7 +172,6 @@ async def delete_recent_hour(
 ):
     async with pool.acquire() as conn:
         async with conn.transaction():
-            # UTC 기준 최근 1시간
             await conn.execute("""
                 DELETE FROM reports
                 WHERE sid IN (
@@ -134,7 +186,7 @@ async def delete_recent_hour(
 
     return RedirectResponse("/_admin", status_code=303)
 
-#오늘 데이터 삭제
+
 @router.post("/delete_today")
 async def delete_today(
     _: HTTPBasicCredentials = Depends(require_admin),
@@ -142,7 +194,6 @@ async def delete_today(
 ):
     async with pool.acquire() as conn:
         async with conn.transaction():
-            # UTC 기준 오늘 00:00 ~ 내일 00:00
             await conn.execute("""
                 DELETE FROM reports
                 WHERE sid IN (
@@ -159,7 +210,7 @@ async def delete_today(
 
     return RedirectResponse("/_admin", status_code=303)
 
-#전체삭제
+
 @router.post("/delete_all")
 async def delete_all(
     _: HTTPBasicCredentials = Depends(require_admin),
@@ -167,20 +218,122 @@ async def delete_all(
 ):
     async with pool.acquire() as conn:
         async with conn.transaction():
-            # 존재하는 테이블만 삭제(테이블명이 다를 수 있어서 방어적으로 처리)
-            # to_regclass는 테이블 없으면 NULL 반환
             async def del_if_exists(table: str):
                 exists = await conn.fetchval("SELECT to_regclass($1)", f"public.{table}")
                 if exists:
                     await conn.execute(f"DELETE FROM {table}")
 
-            # FK 자식 테이블부터
             await del_if_exists("message_schedules")
             await del_if_exists("paid_surveys")
             await del_if_exists("orders")
-
-            # 그 다음 핵심 테이블
             await del_if_exists("reports")
             await del_if_exists("user_sessions")
 
     return RedirectResponse("/_admin", status_code=303)
+```
+
+9. 상세 페이지 수정이 필요하면 그 코드 전체
+
+필요함.
+- 이유: templates/session_detail.html 파일이 비어 있었고,
+  route에서도 order를 템플릿에 전달하지 않고 있었다.
+
+```html
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ReconnectLab Admin Session Detail</title>
+
+<style>
+body{
+  font-family:system-ui;
+  padding:20px;
+}
+
+h1, h2{
+  margin-bottom:10px;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-bottom:24px;
+}
+
+th, td{
+  border-bottom:1px solid #eee;
+  padding:8px;
+  font-size:14px;
+  text-align:left;
+  vertical-align:top;
+}
+
+a{
+  color:inherit;
+}
+</style>
+</head>
+<body>
+
+<h1>Session Detail</h1>
+<p><a href="/_admin">Back to Admin</a></p>
+
+<h2>User Session</h2>
+<table>
+  <tbody>
+    {% for key, value in session.items() %}
+    <tr>
+      <th>{{ key }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Order</h2>
+{% if order %}
+<table>
+  <tbody>
+    {% for key, value in order.items() %}
+    <tr>
+      <th>{{ key }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No order found for this sid.</p>
+{% endif %}
+
+<h2>Report</h2>
+{% if report %}
+<table>
+  <tbody>
+    {% for key, value in report.items() %}
+    <tr>
+      <th>{{ key }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No report found for this sid.</p>
+{% endif %}
+
+</body>
+</html>
+```
+
+10. 최종 판정
+- 원인
+  - admin 목록 SQL이 orders 테이블을 조회하지 않아서 sessions row에 order_id가 없었다.
+
+- 수정 완료 여부
+  - 완료
+
+- 추가 확인이 필요한 점
+  - 실제 운영 DB에서 한 sid에 여러 order가 생길 수 있으면 목록 LEFT JOIN으로 행이 중복될 수 있다.
+  - 현재 모델은 UserSession.order uselist=False 이므로 기존 구조 가정상 1:1에 맞춰 최소 수정만 적용했다.

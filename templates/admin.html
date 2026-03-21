@@ -5,29 +5,38 @@
 <title>ReconnectLab Admin</title>
 
 <style>
-
 body{
-font-family:system-ui;
-padding:20px;
+  font-family:system-ui;
+  padding:20px;
 }
 
 table{
-width:100%;
-border-collapse:collapse;
+  width:100%;
+  border-collapse:collapse;
 }
 
-th,td{
-border-bottom:1px solid #eee;
-padding:8px;
-font-size:14px;
+th, td{
+  border-bottom:1px solid #eee;
+  padding:8px;
+  font-size:14px;
+  text-align:left;
+  vertical-align:top;
 }
 
 button{
-padding:8px 12px;
-margin-right:6px;
-cursor:pointer;
+  padding:8px 12px;
+  margin-right:6px;
+  cursor:pointer;
 }
 
+.summary{
+  color:#666;
+  margin:6px 0 14px;
+}
+
+.actions{
+  margin-top:10px;
+}
 </style>
 
 </head>
@@ -35,73 +44,59 @@ cursor:pointer;
 
 <h1>ReconnectLab Admin</h1>
 
-<div>
-style = "color:#666; margin:6px 0 14px;"
-sessions: {{sessions|length}}
+<div class="summary">
+  sessions: {{ sessions|length }}
+</div>
 
-<form method="post" action="/_admin/delete_recent_hour" style="display:inline;">
-<button>최근 1시간 삭제</button>
-</form>
+<div class="actions">
+  <form method="post" action="/_admin/delete_recent_hour" style="display:inline;">
+    <button type="submit">최근 1시간 삭제</button>
+  </form>
 
-<form method="post" action="/_admin/delete_today" style="display:inline;">
-<button>오늘 삭제</button>
-</form>
+  <form method="post" action="/_admin/delete_today" style="display:inline;">
+    <button type="submit">오늘 삭제</button>
+  </form>
 
-<form method="post" action="/_admin/delete_all" style="display:inline;"
-onsubmit="return confirm('전체 삭제할까요?');">
-<button>전체 삭제</button>
-</form>
-
+  <form method="post" action="/_admin/delete_all" style="display:inline;"
+        onsubmit="return confirm('전체 삭제할까요?');">
+    <button type="submit">전체 삭제</button>
+  </form>
 </div>
 
 <br>
 
 <table>
+  <thead>
+    <tr>
+      <th>sid</th>
+      <th>phone</th>
+      <th>email</th>
+      <th>risk</th>
+      <th>created</th>
+      <th>token</th>
+      <th>order_id</th>
+      <th>status</th>
+    </tr>
+  </thead>
 
-<thead>
-
-<tr>
-<th>sid</th>
-<th>phone</th>
-<th>email</th>
-<th>risk</th>
-<th>created</th>
-<th>token</th>
-<th>status</th>
-</tr>
-
-</thead>
-
-<tbody>
-
-{% for s in sessions %}
-
-<tr>
-
-<td>
-<a href="/_admin/session/{{s.sid}}">
-{{s.sid}}
-</a>
-</td>
-
-<td>{{s.phone}}</td>
-
-<td>{{s.email}}</td>
-
-<td>{{s.risk_level}}</td>
-
-<td>{{s.created_at}}</td>
-
-<td>{{s.report_token}}</td>
-
-<td>{{s.status}}</td>
-
-</tr>
-
-{% endfor %}
-
-</tbody>
-
+  <tbody>
+    {% for s in sessions %}
+    <tr>
+      <td>
+        <a href="/_admin/session/{{ s.sid }}">
+          {{ s.sid }}
+        </a>
+      </td>
+      <td>{{ s.phone }}</td>
+      <td>{{ s.email }}</td>
+      <td>{{ s.risk_level }}</td>
+      <td>{{ s.created_at }}</td>
+      <td>{{ s.report_token }}</td>
+      <td>{{ s.order_id }}</td>
+      <td>{{ s.status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
 </table>
 
 </body>

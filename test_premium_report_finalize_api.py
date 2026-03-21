@@ -152,7 +152,7 @@ def seed_ready_data():
 def test_finalize_premium_report_success(monkeypatch):
     sid, token, order_id = seed_ready_data()
     monkeypatch.setattr(
-        "app.routes_premium.generate_premium_markdown",
+        "app.services.reporting.premium_pipeline.generate_premium_markdown",
         lambda prompt: "# 1. Current state\n\nTest markdown body",
     )
 
@@ -205,7 +205,7 @@ def test_finalize_premium_report_llm_fail_keeps_old_html(monkeypatch):
     def boom(prompt):
         raise RuntimeError("mock llm failure")
 
-    monkeypatch.setattr("app.routes_premium.generate_premium_markdown", boom)
+    monkeypatch.setattr("app.services.reporting.premium_pipeline.generate_premium_markdown", boom)
 
     payload = {
         "order_id": order_id,
@@ -249,7 +249,7 @@ def test_finalize_premium_report_no_overwrite(monkeypatch):
         called["count"] += 1
         return "NEW"
 
-    monkeypatch.setattr("app.routes_premium.generate_premium_markdown", fake_llm)
+    monkeypatch.setattr("app.services.reporting.premium_pipeline.generate_premium_markdown", fake_llm)
 
     payload = {
         "order_id": order_id,
@@ -276,7 +276,7 @@ def test_finalize_premium_report_without_sid_success(monkeypatch):
     sid, token, order_id = seed_ready_data()
 
     monkeypatch.setattr(
-        "app.routes_premium.generate_premium_markdown",
+        "app.services.reporting.premium_pipeline.generate_premium_markdown",
         lambda prompt: "# 1. Current state\n\nTest markdown body",
     )
 

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, Dict, Mapping
 
 from app.services.interpretation.engine import run_interpretation_engine
 from app.services.interpretation.premium_report import build_premium_report_prompt
+from app.services.reporting.llm_client import generate_premium_markdown
 from app.services.reporting.premium_metrics import build_premium_metrics
+from app.services.reporting.premium_renderer import render_premium_report_html
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
@@ -44,3 +47,47 @@ def prepare_premium_report_payload(engine_input: Any) -> Dict[str, Any]:
             "metrics_version": metrics["version"],
         },
     }
+
+
+def generate_premium_report_artifacts(*, prompt: str, metrics: Dict[str, Any]) -> Dict[str, str]:
+    markdown_text = generate_premium_markdown(prompt)
+    html_text = render_premium_report_html(
+        markdown_text,
+        metrics=metrics,
+    )
+    return {
+        "markdown": markdown_text,
+        "html": html_text,
+    }
+
+
+def finalize_premium_report_record(
+    *,
+    report: Any,
+    markdown_text: str,
+    html_text: str,
+    db: Any,
+    overwrite: bool = True,
+):
+    existing_html = (report.html or "").strip()
+    existing_markdown = (report.markdown or "").strip()
+
+    if (
+        not overwrite
+        and report.status == "READY"
+        and existing_html
+        and existing_markdown
+    ):
+        return report
+
+    report.status = "GENERATING"
+    db.commit()
+
+    report.markdown = markdown_text
+    report.html = html_text
+    report.generated_at = datetime.now(UTC)
+    report.status = "READY"
+
+    db.commit()
+    db.refresh(report)
+    return report

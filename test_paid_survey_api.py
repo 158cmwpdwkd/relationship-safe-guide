@@ -154,8 +154,12 @@ def _valid_paid_answers(notes: str = "pytest memo"):
     }
 
 
-def test_submit_paid_survey_success():
+def test_submit_paid_survey_success(monkeypatch):
     sid, token, order_id = seed_paid_accessable_row()
+    monkeypatch.setattr(
+        "app.services.reporting.premium_pipeline.generate_premium_markdown",
+        lambda prompt: "# 1. Current state\n\nAuto premium report",
+    )
 
     payload = {
         "report_token": token,
@@ -171,12 +175,21 @@ def test_submit_paid_survey_success():
     assert body["ok"] is True
     assert body["sid"] == sid
     assert body["saved"] is True
-    assert body["next"] == "GENERATE_REPORT"
+    assert body["order_id"] == order_id
+    assert body["report_token"] == token
+    assert body["state"] == "READY"
+    assert body["next"] == "OPEN_REPORT"
+    assert body["next_url"] == f"/r/{token}"
 
     db = TestingSessionLocal()
     try:
         paid = db.query(PaidSurvey).filter(PaidSurvey.sid == sid).first()
         assert paid is not None
+        report = db.query(Report).filter(Report.sid == sid).first()
+        assert report is not None
+        assert report.status == "READY"
+        assert "Auto premium report" in report.markdown
+        assert "<html" in report.html.lower()
 
         saved_answers = json.loads(paid.answers_json)
         assert saved_answers["q1"] == "short"
@@ -211,8 +224,12 @@ def test_submit_paid_survey_not_paid():
         db.close()
 
 
-def test_paid_survey_save_without_sid_success():
+def test_paid_survey_save_without_sid_success(monkeypatch):
     sid, token, order_id = seed_ready_data()
+    monkeypatch.setattr(
+        "app.services.reporting.premium_pipeline.generate_premium_markdown",
+        lambda prompt: "# 1. Current state\n\nAuto premium report",
+    )
 
     payload = {
         "report_token": token,
@@ -227,6 +244,7 @@ def test_paid_survey_save_without_sid_success():
     assert body["ok"] is True
     assert body["sid"] == sid
     assert body["saved"] is True
+    assert body["state"] == "READY"
 
     payload2 = {
         "report_token": token,
@@ -241,6 +259,7 @@ def test_paid_survey_save_without_sid_success():
     assert body2["ok"] is True
     assert body2["sid"] == sid
     assert body2["saved"] is True
+    assert body2["state"] == "READY"
 
     db = TestingSessionLocal()
     try:

@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ReconnectLab Admin Session Detail</title>
+
+<style>
+body{
+  font-family:system-ui;
+  padding:20px;
+}
+
+h1, h2{
+  margin-bottom:10px;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-bottom:24px;
+}
+
+th, td{
+  border-bottom:1px solid #eee;
+  padding:8px;
+  font-size:14px;
+  text-align:left;
+  vertical-align:top;
+}
+
+a{
+  color:inherit;
+}
+</style>
+</head>
+<body>
+
+<h1>Session Detail</h1>
+<p><a href="/_admin">Back to Admin</a></p>
+
+<h2>User Session</h2>
+<table>
+  <tbody>
+    {% for key, value in session.items() %}
+    <tr>
+      <th>{{ key }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Order</h2>
+{% if order %}
+<table>
+  <tbody>
+    {% for key, value in order.items() %}
+    <tr>
+      <th>{{ key }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No order found for this sid.</p>
+{% endif %}
+
+<h2>Report</h2>
+{% if report %}
+<table>
+  <tbody>
+    {% for key, value in report.items() %}
+    <tr>
+      <th>{{ key }}</th>
+      <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No report found for this sid.</p>
+{% endif %}
+
+</body>
+</html>

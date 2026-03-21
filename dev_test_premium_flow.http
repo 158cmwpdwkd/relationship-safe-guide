@@ -425,3 +425,14 @@ GET {{baseUrl}}/api/premium/report/status?sid={{sid}}&order_id={{order_id}}&repo
 ### - detail = ORDER_NOT_FOUND
 ### ------------------------------------------------------------
 GET {{baseUrl}}/api/premium/report/status?sid={{sid}}&order_id={{missing_order_id}}&report_token={{report_token}}
+
+
+###
+POST http://127.0.0.1:8000/api/premium/report/finalize
+Content-Type: application/json
+
+{
+  "order_id": "RCL_FIXTURE_PREMIUM_20260321_01",
+  "report_token": "t_fixture_premium_20260321_01",
+  "overwrite": true
+}

@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
-from app.models import Order, Report, UserSession
+from app.models import Order, PaidSurvey, Report, UserSession
 from app.routes_premium import router, get_db
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_premium_report_status.db"
@@ -91,6 +91,41 @@ def seed_status_data(status="READY", with_html=True):
         )
         db.add(order)
 
+        paid = PaidSurvey(
+            sid=sid,
+            answers_json=json.dumps(
+                {
+                    "q1": "short",
+                    "q2": "dating_light",
+                    "q3": "never",
+                    "q4": "d3",
+                    "q5": "today_3d",
+                    "q6": "me",
+                    "q7": "fight",
+                    "q8": "mid",
+                    "q9": "cold_clear",
+                    "q10": "repeat_same",
+                    "q11": "avoid",
+                    "q12": "press",
+                    "q13": "normal",
+                    "q14": "none",
+                    "q15": "no",
+                    "q16": "no_contact",
+                    "q17": "m50_70",
+                    "q18": ["sns_stalk"],
+                    "q19": ["focus_down"],
+                    "q20": "reconnect",
+                    "q7_text": None,
+                    "q12_text": None,
+                    "q20_text": None,
+                    "notes": "status test",
+                },
+                ensure_ascii=False,
+            ),
+            submitted_at=now,
+        )
+        db.add(paid)
+
         db.commit()
         return sid, token, order_id
     finally:
@@ -133,6 +168,6 @@ def test_premium_report_status_generating():
     body = res.json()
 
     assert body["ok"] is True
-    assert body["status"] == "GENERATING"
+    assert body["status"] == "PROCESSING"
     assert body["has_html"] is False
     assert body["has_markdown"] is False
