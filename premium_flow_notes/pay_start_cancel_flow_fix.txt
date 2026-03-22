@@ -1,0 +1,32 @@
+1. 취소 후 `/pay/start`에 남던 실제 원인
+- 새 창으로 `/pay/start`는 열리지만, 사용자가 결제를 취소했을 때 실제 close/exit 경로가 항상 호출되지 않아 런처 페이지가 그대로 남을 수 있었다.
+- 결과적으로 주소창이 `/pay/start?...`에 머무르고, 이후 free 복귀 흐름의 오염 원인이 됐다.
+
+2. 실제 취소 케이스에서 호출되는 경로(close/exit/기타)
+- 기존 코드 기준 close/exit 경로는 준비되어 있었지만, 실브라우저 취소 케이스에서 항상 타는 것이 보장되지 않았다.
+- 이번 수정에서는:
+  - `closeUrl` 을 직접 `payment-fail` URL 로 연결
+  - `/pay/start` 문서 자체에도 blur/focus/visibility 기반 취소 fallback 을 추가
+- 따라서 closeUrl 이 호출되지 않아도 런처 페이지가 `payment-fail` 로 빠질 수 있게 했다.
+
+3. payment-fail로 이동하도록 수정한 위치
+- `app/routes_payments.py`
+  - `build_inicis_form()` 의 `closeUrl` 을 `payment-fail` 직접 URL 로 변경
+  - `render_inicis_html()` 에서:
+    - `pay.start.boot`
+    - `pay.start.open_inicis`
+    - `pay.start.close_detected`
+    - `pay.start.cancel_detected`
+    - `pay.start.redirect_payment_fail`
+    - `pay.start.redirect_target`
+    로그 추가
+    - blur/focus/visibilitychange 기반 취소 감지 후 `window.location.replace(paymentFailUrl)` 추가
+
+4. 수정한 파일 목록
+- app/routes_payments.py
+
+5. 테스트 시나리오
+- free-report -> 결제 버튼 -> 새 창 열림
+- 결제 취소
+- 새 창 주소가 `payment-fail` 로 바뀌는지 확인
+- `/pay/start?...` 에 남지 않는지 확인

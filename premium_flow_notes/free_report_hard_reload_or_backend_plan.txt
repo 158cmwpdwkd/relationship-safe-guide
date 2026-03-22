@@ -1,0 +1,49 @@
+1. free-report 오염의 가장 유력한 원인
+- `reconnectlab.co.kr/report?token=...` 로 돌아와도 아임웹 전환 과정에서 이전 payment-fail DOM 조각이 완전히 정리되지 않고 남는 렌더링 컨텍스트 문제가 가장 유력하다.
+- free-report.html 내부에 payment-fail 전체 마크업이 직접 들어있는 것은 확인되지 않았으므로, URL 계산보다 페이지 전환 시 DOM 재사용 가능성이 더 크다.
+
+2. hard reload 전략으로 추가한 수정
+- payment-fail CTA 가 free 복귀 URL에 `rcl_force_reload=1` 을 붙여 이동
+- free-report 는 로드시 `rcl_force_reload=1` 을 감지하면 clean URL(`.../report?token=...`) 로 즉시 `replace`
+- force reload 가 걸린 순간 이후 렌더 로직은 건너뜀
+- 기존 `removePaymentFailArtifacts()` 도 유지하면서 payment-fail 텍스트/버튼 조각 제거를 더 강하게 보강
+
+3. 수정한 파일 목록
+- imweb/imweb payment-fail.html
+- imweb/imweb free-report.html
+
+4. 테스트 방법
+- payment-fail -> 무료리포트 다시 보기
+- 주소창이 `/report?token=...` 로 유지되는지 확인
+- `rcl_force_reload=1` 이 한 번 붙었다가 clean URL 로 정리되는지 확인
+- free 화면에서 payment-fail 카드가 사라지는지 확인
+- `free.force_reload_detected`, `free.force_reload_clean`, `free.render.only` 로그 확인
+
+5. hard reload 실패 시 백엔드 HTML 전환 설계안 요약
+- 추천 수정 파일 목록
+  - app/routes_report.py
+  - app/report.py
+  - imweb/imweb free-report.html
+- 구조
+  - free report 도 premium 처럼 백엔드에서 최종 HTML 을 바로 반환
+  - 아임웹 `/report` 페이지는 shell 또는 iframe wrapper 만 유지
+  - free content DOM 은 백엔드 응답 HTML 이 단일 소스로 책임짐
+- 추천 endpoint
+  - 기존 `/r/{token}` 또는 `/report?token=...` 를 free/premium 공통 HTML 진입점으로 계속 사용
+  - free token 인 경우 `app/report.py` 기반 HTML 을 서버에서 직접 반환
+- 아임웹 역할
+  - shell 만 남기거나, 가능하면 free-report 도 wrapper 최소화
+- 장점
+  - 아임웹 페이지 전환 시 DOM 잔존 문제를 구조적으로 줄일 수 있음
+  - free/premium 모두 서버 HTML 응답 기준으로 일관됨
+- 단점
+  - 현재 아임웹 free wrapper 의 일부 프론트 로직을 서버 쪽으로 옮겨야 함
+  - 배포/검수 범위가 조금 커짐
+- 마이그레이션 최소 단계
+  1. free report 백엔드 HTML endpoint 확정
+  2. imweb free wrapper 를 shell 전용으로 축소
+  3. free token 진입 시 iframe 또는 direct HTML 방식 중 하나로 단일화
+
+6. 백엔드 HTML 전환이 왜 구조적으로 더 안정적인지
+- free-report 오염 문제가 아임웹 페이지 DOM 재사용에서 비롯된 경우, 서버가 최종 HTML 을 직접 서빙하면 렌더링 책임이 한 곳으로 모인다.
+- 이 방식은 payment-fail/free-report 간 UI 조각이 같은 페이지 문맥에서 남는 문제를 원천적으로 줄일 수 있다.

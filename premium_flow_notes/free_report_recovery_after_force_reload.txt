@@ -1,0 +1,47 @@
+1. 무료리포트가 안 뜨게 된 직접 원인
+- `rcl_force_reload=1` 감지 후 `replace`
+- 그 직후 렌더 스킵 분기
+- broad DOM 제거 로직
+이 조합이 free-report 정상 렌더 진입 자체를 막고 있었다.
+
+2. 롤백한 hard reload 관련 로직
+- payment-fail CTA 의 `rcl_force_reload=1` 부착 제거
+- free-report 의 `rcl_force_reload=1` 감지/clean replace 제거
+- force reload 시 렌더 전체를 건너뛰던 분기 제거
+
+3. free-report 정상 렌더 복구를 위해 수정한 순서
+- free.boot.start
+- free.token.detected
+- free.enter
+- free.cleanup.start
+- free.cleanup.done
+- free.render.start
+- frame src 설정
+- 최소 artifact cleanup
+- free.render.only
+- free.render.done
+
+4. 제거 범위를 축소한 payment-fail cleanup 규칙
+- 유지:
+  - `#returnBtn` 이고 텍스트가 `무료리포트 다시 보기` 인 경우만 제거
+  - `결제가 취소되었거나 실패했어요` heading 이 포함된 fail card 만 제거
+- 제거:
+  - broad `.card/.page/section/div` 순회 삭제 로직
+- 따라서 free 메인 루트, 공통 카드, CTA, 콘텐츠 영역은 더 이상 제거 대상이 아니다.
+
+5. 수정한 파일 목록
+- imweb/imweb free-report.html
+- imweb/imweb payment-fail.html
+
+6. 테스트 시나리오
+- `/report?token=...` 직접 진입
+  - free report 정상 렌더 확인
+- 결제 취소 후 payment-fail 진입
+- payment-fail -> 무료리포트 다시 보기
+  - 최소한 free report가 다시 뜨는지 확인
+- 로그 확인
+  - free.boot.start
+  - free.token.detected
+  - free.cleanup.done
+  - free.render.start
+  - free.render.done

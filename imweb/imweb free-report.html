@@ -548,6 +548,7 @@
     }
 
     function showError() {
+      debugLog("free.render.blocked", { reason: "missing_token_or_load_error" });
       hide(loadingEl);
       hide(frameWrapEl);
       hide(extrasEl);
@@ -560,6 +561,7 @@
       show(frameWrapEl, "block");
       show(extrasEl, "block");
       debugLog("free.render.only", { token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "" });
+      debugLog("free.render.done", { token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "" });
 
       setTimeout(() => {
         document.querySelectorAll(".fade-up").forEach(el => el.classList.add("in"));
@@ -730,13 +732,17 @@
       return getQueryToken() || getPathToken() || getStoredToken() || "";
     }
 
+    debugLog("free.boot.start", { href: window.location.href });
     const token = getReportToken();
+    debugLog("free.token.detected", {
+      token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : ""
+    });
     debugLog("free.enter", {
       token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "",
       href: window.location.href
     });
-    removePaymentFailArtifacts();
     cleanupPremiumState();
+    debugLog("free.cleanup.done", {});
 
     if (!token) {
       showError();
@@ -747,8 +753,12 @@
       debugLog("free.return.enter", {
         returnUrl: canonicalFreeReturnUrl
       });
+      debugLog("free.render.start", {
+        token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : ""
+      });
 
       frameEl.src = API_BASE + "/r/" + encodeURIComponent(token) + "?v=" + Date.now();
+      removePaymentFailArtifacts();
 
       frameEl.addEventListener("load", () => {
         frameEl.classList.add("loaded");

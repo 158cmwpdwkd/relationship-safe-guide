@@ -252,7 +252,11 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
         "buyeremail": buyer_email,
         "buyertel": buyer_tel,
         "returnUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/return",
-        "closeUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/close" + (f"?{close_query}" if close_query else ""),
+        "closeUrl": build_payment_fail_target(
+            mode="cancel",
+            free_return_url=(free_return_url or "").strip(),
+            free_token=(free_token or "").strip(),
+        ),
         "charset": "UTF-8",
         "format": "JSON",
         "payViewType": "overlay",
@@ -345,6 +349,19 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
             current_url: window.location.href
           }});
 
+          var paymentFailUrl = "{build_payment_fail_target(mode='cancel', free_return_url=free_return_url, free_token=free_token)}";
+          var payStarted = false;
+          var redirecting = false;
+          var sawBlur = false;
+
+          function redirectPaymentFail(reason) {{
+            if (redirecting) return;
+            redirecting = true;
+            console.debug("[RCL payment]", "pay.start.redirect_payment_fail", {{ reason: reason }});
+            console.debug("[RCL payment]", "pay.start.redirect_target", paymentFailUrl);
+            window.location.replace(paymentFailUrl);
+          }}
+
           var removed = [];
           ["rcl-nav", "rcl-main", "rcl-footer", "rcl-state", "rcl-report-outer"].forEach(function (id) {{
             var node = document.getElementById(id);
@@ -354,6 +371,7 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
             }}
           }});
           console.debug("[RCL payment]", "payment.free_dom.cleanup", {{ removed: removed }});
+          console.debug("[RCL payment]", "pay.start.boot", {{ current_url: window.location.href, close_url: "{build_payment_fail_target(mode='cancel', free_return_url=free_return_url, free_token=free_token)}" }});
 
           if (window.self !== window.top) {{
             console.debug("[RCL payment]", "payment.fail.redirect.mode", "embedded_context_escape");
@@ -377,6 +395,28 @@ if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
             }}
             return;
           }}
+          window.addEventListener("blur", function () {{
+            if (!payStarted) return;
+            sawBlur = true;
+            console.debug("[RCL payment]", "pay.start.close_detected", {{ event: "blur" }});
+          }});
+          window.addEventListener("focus", function () {{
+            if (!payStarted || !sawBlur || redirecting) return;
+            console.debug("[RCL payment]", "pay.start.cancel_detected", {{ event: "focus_after_blur" }});
+            redirectPaymentFail("focus_after_blur");
+          }});
+          document.addEventListener("visibilitychange", function () {{
+            if (!payStarted || redirecting) return;
+            if (document.visibilityState === "hidden") {{
+              sawBlur = true;
+              console.debug("[RCL payment]", "pay.start.close_detected", {{ event: "visibility_hidden" }});
+            }} else if (document.visibilityState === "visible" && sawBlur) {{
+              console.debug("[RCL payment]", "pay.start.cancel_detected", {{ event: "visibility_visible_after_hidden" }});
+              redirectPaymentFail("visibility_visible_after_hidden");
+            }}
+          }});
+          payStarted = true;
+          console.debug("[RCL payment]", "pay.start.open_inicis", {{ current_url: window.location.href }});
           INIStdPay.pay("inicisPayForm");
         }});
       </script>
