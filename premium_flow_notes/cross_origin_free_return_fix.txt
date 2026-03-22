@@ -1,0 +1,58 @@
+1. cross-origin 때문에 storage 기반 복귀가 왜 실패했는지
+- free-report 는 `reconnectlab.co.kr` 에서 열리고, 결제 시작/중간 흐름은 `relationship-safe-guide-api.onrender.com` 으로 넘어간다.
+- 이 도메인 경계 때문에 localStorage/sessionStorage 에 저장한 free 복귀 정보가 결제 도중/복귀 시점에 그대로 이어지지 않을 수 있다.
+- 따라서 storage 단독 복귀는 불안정하고, 결제 시작 시 query 로 free 복귀 정보를 명시 전달해야 한다.
+
+2. 수정한 파일 목록
+- imweb/imweb free-report.html
+- imweb/imweb payment-fail.html
+- app/routes_payments.py
+
+3. free-report에서 결제 시작 URL에 무엇을 어떻게 실었는지
+- premium CTA 클릭 시 결제 시작 URL에 아래 query 를 추가하도록 변경했다.
+  - `free_return_url`
+  - `free_token`
+- `free_return_url` 는 free wrapper canonical URL 이다.
+- 관련 로그:
+  - `free.premium_cta.build`
+  - `free.premium_cta.attach_free_return_url`
+  - `free.premium_cta.attach_free_token`
+  - `free.premium_cta.href`
+
+4. routes_payments.py 에서 어떤 query를 어떻게 유지/전달하도록 바꿨는지
+- `/pay/start`
+  - `free_return_url`, `free_token` query 수신
+- `build_inicis_form()`
+  - 주문 prepare payload 에 `free_return_url`, `free_token` 저장
+  - `closeUrl` 에도 동일 query 부착
+- `render_inicis_html()`
+  - script load fail 시 `payment-fail` 이동 URL 에 동일 query 유지
+- `/api/payments/inicis/close`
+  - `free_return_url`, `free_token` query 수신 후 exit 페이지에서 그대로 `payment-fail` 로 전달
+- `/api/payments/inicis/exit`
+  - `free_return_url`, `free_token` query 수신 후 `payment-fail` 로 그대로 전달
+- `inicis_return()` fail 일부 경로
+  - order prepare payload 에 저장해둔 `free_return_url`, `free_token` 을 다시 꺼내 exit URL 로 전달
+
+5. payment-fail의 최종 복귀 URL 우선순위
+- 1순위: query `free_return_url`
+- 2순위: query `free_token` 기반 canonical free URL
+- 3순위: localStorage/sessionStorage `rl_free_report_return_url`
+- 4순위: localStorage/sessionStorage `rl_free_report_token`
+- 5순위: 홈
+- query 값이 valid 하면 storage 보다 항상 우선한다.
+
+6. free_token만 있을 때 생성되는 canonical free URL 형식
+- `https://reconnectlab.co.kr/report?token={free_token}`
+
+7. 테스트 시나리오
+- free -> premium 클릭
+  - `free.premium_cta.href` 에 `free_return_url`, `free_token` 이 붙는지 확인
+- 결제 취소
+  - `payment-fail` 진입 URL query 에 `free_return_url` 또는 `free_token` 이 유지되는지 확인
+- 무료리포트 다시 보기 클릭
+  - `payment_fail.return_path.selected` 가 query 기반 source 를 선택하는지 확인
+- 원래 free wrapper URL 복귀 확인
+  - `payment_fail.return_cta.href` 가 `reconnectlab.co.kr` free report URL 인지 확인
+- 복귀 후 premium NOT_PAID 재유입 없는지 확인
+  - free 진입 후 cleanup 로그와 정상 free 렌더 확인

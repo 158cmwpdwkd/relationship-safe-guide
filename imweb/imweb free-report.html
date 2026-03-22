@@ -595,42 +595,97 @@
       } catch (e) {}
     }
 
-    function setPremiumReturnUrl(url) {
+    function buildCanonicalFreeReturnUrl(rawUrl, freeToken) {
+      debugLog("free.return_url.capture", {
+        rawUrl: rawUrl || "",
+        token: freeToken ? (freeToken.slice(0, 4) + "..." + freeToken.slice(-4)) : ""
+      });
       try {
-        if (url) {
-          localStorage.setItem(FREE_RETURN_URL_STORAGE_KEY, url);
-        }
-      } catch (e) {}
-    }
-
-    function normalizeFreeReturnUrl(url) {
-      try {
-        const parsed = new URL(url, window.location.origin);
-        const token = parsed.searchParams.get("token");
+        const parsed = new URL(rawUrl || window.location.href, window.location.origin);
+        const token = freeToken || parsed.searchParams.get("token") || "";
         if (!token) return "";
-        return parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token);
+        const normalized = parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token);
+        debugLog("free.return_url.normalized", { url: normalized });
+        return normalized;
       } catch (e) {
+        debugLog("free.return_url.normalized", { url: "", reason: "invalid_url" });
         return "";
       }
     }
 
+    function validateFreeReturnUrl(url) {
+      if (!url) {
+        return { ok: false, reason: "empty_url" };
+      }
+
+      try {
+        const parsed = new URL(url, window.location.origin);
+        const pathname = (parsed.pathname || "").toLowerCase();
+        const hostname = (parsed.hostname || "").toLowerCase();
+
+        if (!parsed.searchParams.get("token")) return { ok: false, reason: "missing_token" };
+        if (pathname.includes("/pay/start")) return { ok: false, reason: "pay_start_path" };
+        if (pathname.includes("payment-fail")) return { ok: false, reason: "payment_fail_path" };
+        if (pathname.includes("premium")) return { ok: false, reason: "premium_path" };
+        if (hostname.includes("onrender.com")) return { ok: false, reason: "api_domain" };
+
+        return { ok: true, normalized: parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(parsed.searchParams.get("token")) };
+      } catch (e) {
+        return { ok: false, reason: "invalid_url" };
+      }
+    }
+
+    function saveCanonicalFreeReturnUrl(url) {
+      const result = validateFreeReturnUrl(url);
+      if (!result.ok) {
+        debugLog("free.return_url.reject", {
+          reason: result.reason,
+          attemptedUrl: url || ""
+        });
+        return "";
+      }
+
+      try {
+        localStorage.setItem(FREE_RETURN_URL_STORAGE_KEY, result.normalized);
+        sessionStorage.setItem(FREE_RETURN_URL_STORAGE_KEY, result.normalized);
+      } catch (e) {}
+
+      debugLog("free.return_url.saved", { url: result.normalized });
+      return result.normalized;
+    }
+
     function cleanupPremiumState() {
-      try {
-        localStorage.removeItem(PREMIUM_TOKEN_STORAGE_KEY);
-      } catch (e) {}
-      try {
-        sessionStorage.removeItem(PAYMENT_LAST_MODE_KEY);
-        sessionStorage.removeItem(PAYMENT_LAST_CODE_KEY);
-        sessionStorage.removeItem(PAYMENT_LAST_MSG_KEY);
-      } catch (e) {}
-      debugLog("free.cleanup.premium_state", {
-        removedKeys: [
-          PREMIUM_TOKEN_STORAGE_KEY,
-          PAYMENT_LAST_MODE_KEY,
-          PAYMENT_LAST_CODE_KEY,
-          PAYMENT_LAST_MSG_KEY
-        ]
+      const removedKeys = [];
+      const cleanupKeys = [
+        PREMIUM_TOKEN_STORAGE_KEY,
+        PAYMENT_LAST_MODE_KEY,
+        PAYMENT_LAST_CODE_KEY,
+        PAYMENT_LAST_MSG_KEY,
+        "rl_premium_entry_token",
+        "rl_premium_last_state",
+        "rl_premium_runtime_state",
+        "rl_premium_frame_session"
+      ];
+
+      debugLog("free.cleanup.start", {});
+
+      cleanupKeys.forEach((key) => {
+        try {
+          if (localStorage.getItem(key) !== null) {
+            localStorage.removeItem(key);
+            removedKeys.push("localStorage:" + key);
+          }
+        } catch (e) {}
+
+        try {
+          if (sessionStorage.getItem(key) !== null) {
+            sessionStorage.removeItem(key);
+            removedKeys.push("sessionStorage:" + key);
+          }
+        } catch (e) {}
       });
+
+      debugLog("free.cleanup.removed", { removedKeys });
     }
 
     function getReportToken() {
@@ -647,10 +702,11 @@
     if (!token) {
       showError();
     } else {
+      const canonicalFreeReturnUrl = buildCanonicalFreeReturnUrl(window.location.href, token);
       setStoredToken(token);
-      setPremiumReturnUrl(normalizeFreeReturnUrl(window.location.href));
+      saveCanonicalFreeReturnUrl(canonicalFreeReturnUrl);
       debugLog("free.return.enter", {
-        returnUrl: normalizeFreeReturnUrl(window.location.href)
+        returnUrl: canonicalFreeReturnUrl
       });
 
       frameEl.src = API_BASE + "/r/" + encodeURIComponent(token) + "?v=" + Date.now();
@@ -745,8 +801,17 @@
       const originalText = btn ? btn.innerHTML : "";
 
       try {
-        const normalizedReturnUrl = normalizeFreeReturnUrl(currentFreeUrl);
-        setPremiumReturnUrl(normalizedReturnUrl);
+        const normalizedReturnUrl = buildCanonicalFreeReturnUrl(currentFreeUrl, reportToken);
+        debugLog("free.return_url.skip_overwrite", {
+          existingUrl: (() => {
+            try {
+              return localStorage.getItem(FREE_RETURN_URL_STORAGE_KEY) || sessionStorage.getItem(FREE_RETURN_URL_STORAGE_KEY) || "";
+            } catch (e) {
+              return "";
+            }
+          })(),
+          attemptedUrl: normalizedReturnUrl || ""
+        });
         debugLog("free.cta.to_premium", {
           returnUrl: normalizedReturnUrl,
           reportToken: reportToken ? (reportToken.slice(0, 4) + "..." + reportToken.slice(-4)) : ""
@@ -759,7 +824,21 @@
         }
 
         const url = new URL(PAYMENT_START_URL);
+        debugLog("free.premium_cta.build", {
+          paymentStartUrl: PAYMENT_START_URL,
+          canonicalFreeReturnUrl: normalizedReturnUrl,
+          freeToken: reportToken ? (reportToken.slice(0, 4) + "..." + reportToken.slice(-4)) : ""
+        });
         url.searchParams.set("report_token", reportToken);
+        if (normalizedReturnUrl) {
+          url.searchParams.set("free_return_url", normalizedReturnUrl);
+          debugLog("free.premium_cta.attach_free_return_url", { url: normalizedReturnUrl });
+        }
+        url.searchParams.set("free_token", reportToken);
+        debugLog("free.premium_cta.attach_free_token", {
+          token: reportToken ? (reportToken.slice(0, 4) + "..." + reportToken.slice(-4)) : ""
+        });
+        debugLog("free.premium_cta.href", { href: url.toString() });
 
         window.location.href = url.toString();
       } catch (error) {

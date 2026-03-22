@@ -1,0 +1,60 @@
+1. rl_free_report_return_url를 잘못 덮어쓰던 실제 위치
+- imweb/imweb free-report.html
+  - free 진입 시 저장
+  - premium CTA 클릭 직전에도 다시 저장
+- 문제는 CTA 경로에서 free return URL 저장이 다시 실행되면서, 상황에 따라 free canonical URL 외 값이 덮어쓸 여지가 남아 있었다.
+
+2. 왜 pay/start?...가 free return URL로 저장됐는지
+- free return URL 저장 책임과 premium 결제 시작 URL 이동 책임이 CTA 흐름 안에 함께 있어, 저장 대상과 이동 대상이 같은 흐름에서 섞일 수 있었다.
+- 이번 수정으로 CTA는 더 이상 rl_free_report_return_url를 저장하지 않고, free 진입 시 한 번 저장된 canonical URL만 유지한다.
+
+3. canonical free URL 저장 규칙을 어떻게 고정했는지
+- 저장 시점: free wrapper 진입 시만
+- 저장 형식:
+  - window.location.origin + window.location.pathname + "?token=" + freeToken
+- 저장 전 검증:
+  - token 존재 필수
+  - /pay/start 금지
+  - /payment-fail 금지
+  - premium 경로 금지
+  - onrender API 도메인 금지
+- 관련 로그:
+  - free.return_url.capture
+  - free.return_url.normalized
+  - free.return_url.saved
+  - free.return_url.skip_overwrite
+  - free.return_url.reject
+
+4. 저장 금지한 경로 목록
+- /pay/start
+- /payment-fail
+- premium 경로
+- relationship-safe-guide-api.onrender.com 같은 API 도메인 직접 URL
+
+5. payment-fail에서 invalid/fallback 판단 규칙
+- localStorage 의 rl_free_report_return_url 검증
+- sessionStorage 의 rl_free_report_return_url 검증
+- 둘 다 invalid 면 home fallback
+- invalid 로그:
+  - payment_fail.return_path.invalid
+- home fallback 로그:
+  - payment_fail.return_path.fallback_home
+- selected 로그:
+  - payment_fail.return_path.selected
+  - payment_fail.return_cta.href
+
+6. 수정한 파일 목록
+- imweb/imweb free-report.html
+- imweb/imweb payment-fail.html
+
+7. 테스트 시나리오
+- free 진입 시 canonical URL 저장 확인
+  - free.return_url.saved 로그 확인
+- premium CTA 클릭 시 overwrite 안 되는지 확인
+  - free.return_url.skip_overwrite 로그 확인
+- 결제 취소 -> payment-fail
+  - payment_fail.return_path.raw_url / selected / invalid / fallback_home 로그 확인
+- 리포트로 돌아가기 버튼 href 확인
+  - payment_fail.return_cta.href 로그 확인
+- free report 정상 복귀 확인
+  - 복귀 후 free.enter / free.cleanup.start / free.cleanup.removed / free.return.enter 확인

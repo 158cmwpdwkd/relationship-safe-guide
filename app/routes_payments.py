@@ -34,12 +34,42 @@ class PreparePaymentIn(BaseModel):
     buyerName: Optional[str] = "고객"
     buyerEmail: Optional[str] = "help@reconnectlab.co.kr"
     buyerTel: Optional[str] = "010-0000-0000"
+    freeReturnUrl: Optional[str] = None
+    freeToken: Optional[str] = None
 
 
-def _render_client_return_page(*, mode: str, code: str = "", msg: str = "") -> HTMLResponse:
+def build_payment_fail_query(*, free_return_url: str = "", free_token: str = "", code: str = "", msg: str = "", mode: str = "") -> str:
+    parts = []
+    if mode:
+        parts.append(f"mode={quote(mode)}")
+    if code:
+        parts.append(f"code={quote(code)}")
+    if msg:
+        parts.append(f"msg={quote(msg)}")
+    if (free_return_url or "").strip():
+        parts.append(f"free_return_url={quote((free_return_url or '').strip(), safe='')}")
+    if (free_token or "").strip():
+        parts.append(f"free_token={quote((free_token or '').strip(), safe='')}")
+    return "&".join(parts)
+
+
+def build_payment_fail_target(*, free_return_url: str = "", free_token: str = "", code: str = "", msg: str = "", mode: str = "") -> str:
+    query = build_payment_fail_query(
+        free_return_url=free_return_url,
+        free_token=free_token,
+        code=code,
+        msg=msg,
+        mode=mode,
+    )
+    return f"{PAYMENT_FAIL_URL}?{query}" if query else PAYMENT_FAIL_URL
+
+
+def _render_client_return_page(*, mode: str, code: str = "", msg: str = "", free_return_url: str = "", free_token: str = "") -> HTMLResponse:
     safe_mode = (mode or "cancel").strip().lower()
     safe_code = quote(code or "")
     safe_msg = quote(msg or "")
+    safe_free_return_url = quote(free_return_url or "", safe="")
+    safe_free_token = quote(free_token or "", safe="")
     return HTMLResponse(
         content=f"""
         <!doctype html>
@@ -56,6 +86,8 @@ def _render_client_return_page(*, mode: str, code: str = "", msg: str = "") -> H
               var mode = "{safe_mode}";
               var code = decodeURIComponent("{safe_code}");
               var msg = decodeURIComponent("{safe_msg}");
+              var freeReturnUrl = decodeURIComponent("{safe_free_return_url}");
+              var freeToken = decodeURIComponent("{safe_free_token}");
 
               function log(event, payload) {{
                 console.debug("[RCL payment exit]", event, payload || {{}});
@@ -66,6 +98,8 @@ def _render_client_return_page(*, mode: str, code: str = "", msg: str = "") -> H
                 if (mode) params.set("mode", mode);
                 if (code) params.set("code", code);
                 if (msg) params.set("msg", msg);
+                if (freeReturnUrl) params.set("free_return_url", freeReturnUrl);
+                if (freeToken) params.set("free_token", freeToken);
                 var qs = params.toString();
                 return qs ? PAYMENT_FAIL_URL + "?" + qs : PAYMENT_FAIL_URL;
               }}
@@ -81,10 +115,22 @@ def _render_client_return_page(*, mode: str, code: str = "", msg: str = "") -> H
               }} else {{
                 log("payment.fail.redirect", {{ mode: mode, code: code }});
               }}
+              log("payment.redirect.query_in", {{
+                free_return_url: freeReturnUrl || "",
+                free_token: freeToken ? (freeToken.slice(0, 4) + "..." + freeToken.slice(-4)) : ""
+              }});
               log("payment.exit.redirect", {{ mode: mode, code: code }});
 
               var targetUrl = buildTargetUrl();
+              log("payment.redirect.query_out", {{
+                free_return_url: freeReturnUrl || "",
+                free_token: freeToken ? (freeToken.slice(0, 4) + "..." + freeToken.slice(-4)) : ""
+              }});
               log("payment.redirect.target", {{ url: targetUrl }});
+              log("payment.exit.query_out", {{
+                free_return_url: freeReturnUrl || "",
+                free_token: freeToken ? (freeToken.slice(0, 4) + "..." + freeToken.slice(-4)) : ""
+              }});
 
               if (window.opener && !window.opener.closed) {{
                 try {{
@@ -191,6 +237,14 @@ def get_report_token_from_order(order: Order) -> str:
     return ""
 
 
+def get_free_return_context(prepared_payload: dict) -> tuple[str, str]:
+    if not isinstance(prepared_payload, dict):
+        return "", ""
+    free_return_url = str(prepared_payload.get("free_return_url") or "").strip()
+    free_token = str(prepared_payload.get("free_token") or "").strip()
+    return free_return_url, free_token
+
+
 def get_pay_method(approve_data: dict) -> str:
     return str(
         approve_data.get("payMethod")
@@ -204,7 +258,7 @@ def is_vbank_pay_method(pay_method: str) -> bool:
     return pay_method in {"VBANK", "VACCT"}
 
 
-def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buyer_tel: str):
+def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buyer_tel: str, free_return_url: str = "", free_token: str = ""):
     """
     주문 생성 + 이니시스 요청 form 데이터 생성 공통 함수
     """
@@ -239,6 +293,8 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
                     "buyerName": buyer_name,
                     "buyerEmail": buyer_email,
                     "buyerTel": buyer_tel,
+                    "free_return_url": (free_return_url or "").strip(),
+                    "free_token": (free_token or "").strip(),
                     "created_at": datetime.utcnow().isoformat(),
                 },
                 ensure_ascii=False,
@@ -248,6 +304,11 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
         db.commit()
     finally:
         db.close()
+
+    close_query = build_payment_fail_query(
+        free_return_url=(free_return_url or "").strip(),
+        free_token=(free_token or "").strip(),
+    )
 
     form = {
         "version": "1.0",
@@ -265,7 +326,7 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
         "buyeremail": buyer_email,
         "buyertel": buyer_tel,
         "returnUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/return",
-        "closeUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/close",
+        "closeUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/close" + (f"?{close_query}" if close_query else ""),
         "charset": "UTF-8",
         "format": "JSON",
         "payViewType": "overlay",
@@ -277,7 +338,7 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
     return form
 
 
-def render_inicis_html(form: dict) -> HTMLResponse:
+def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str = "") -> HTMLResponse:
     inputs = []
     for key, value in form.items():
         if value is None:
@@ -354,7 +415,7 @@ def render_inicis_html(form: dict) -> HTMLResponse:
         window.addEventListener("load", function () {{
           if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
             alert("결제 모듈을 불러오지 못했습니다.");
-            window.location.href = "{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=INICIS_SCRIPT_LOAD_FAIL";
+            window.location.href = "{build_payment_fail_target(mode='fail', code='INICIS_SCRIPT_LOAD_FAIL', free_return_url=free_return_url, free_token=free_token)}";
             return;
           }}
           INIStdPay.pay("inicisPayForm");
@@ -372,14 +433,22 @@ async def pay_start_page(
     buyer_name: str = Query("고객"),
     buyer_email: str = Query("help@reconnectlab.co.kr"),
     buyer_tel: str = Query("010-0000-0000"),
+    free_return_url: str = Query(""),
+    free_token: str = Query(""),
 ):
     form = build_inicis_form(
         report_token=report_token,
         buyer_name=buyer_name or "고객",
         buyer_email=buyer_email or "help@reconnectlab.co.kr",
         buyer_tel=buyer_tel or "010-0000-0000",
+        free_return_url=free_return_url or "",
+        free_token=free_token or "",
     )
-    return render_inicis_html(form)
+    return render_inicis_html(
+        form,
+        free_return_url=free_return_url or "",
+        free_token=free_token or "",
+    )
 
 
 @router.post("/api/payments/inicis/prepare")
@@ -389,6 +458,8 @@ async def inicis_prepare(payload: PreparePaymentIn):
         buyer_name=payload.buyerName or "고객",
         buyer_email=payload.buyerEmail or "help@reconnectlab.co.kr",
         buyer_tel=payload.buyerTel or "010-0000-0000",
+        free_return_url=payload.freeReturnUrl or "",
+        free_token=payload.freeToken or "",
     )
 
     return {
@@ -398,8 +469,15 @@ async def inicis_prepare(payload: PreparePaymentIn):
 
 
 @router.api_route("/api/payments/inicis/close", methods=["GET", "POST"], response_class=HTMLResponse)
-async def inicis_close():
-    return _render_client_return_page(mode="cancel")
+async def inicis_close(
+    free_return_url: str = Query(""),
+    free_token: str = Query(""),
+):
+    return _render_client_return_page(
+        mode="cancel",
+        free_return_url=free_return_url or "",
+        free_token=free_token or "",
+    )
     return HTMLResponse(
         content=f"""
         <!doctype html>
@@ -427,8 +505,20 @@ async def inicis_close():
 
 
 @router.get("/api/payments/inicis/exit", response_class=HTMLResponse)
-async def inicis_exit(mode: str = Query("cancel"), code: str = Query(""), msg: str = Query("")):
-    return _render_client_return_page(mode=mode, code=code, msg=msg)
+async def inicis_exit(
+    mode: str = Query("cancel"),
+    code: str = Query(""),
+    msg: str = Query(""),
+    free_return_url: str = Query(""),
+    free_token: str = Query(""),
+):
+    return _render_client_return_page(
+        mode=mode,
+        code=code,
+        msg=msg,
+        free_return_url=free_return_url or "",
+        free_token=free_token or "",
+    )
 
 
 @router.post("/api/payments/inicis/return")
@@ -477,6 +567,7 @@ async def inicis_return(
             prepared_payload = json.loads(order.pg_payload_json or "{}")
         except Exception:
             prepared_payload = {}
+        free_return_url, free_token = get_free_return_context(prepared_payload)
 
         timestamp = str(int(time.time() * 1000))
         signature = make_auth_signature(authToken, timestamp)
@@ -537,7 +628,7 @@ async def inicis_return(
                     pass
 
             return RedirectResponse(
-                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=APPROVE_HTTP_ERROR",
+                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?{build_payment_fail_query(mode='fail', code='APPROVE_HTTP_ERROR', free_return_url=free_return_url, free_token=free_token)}",
                 status_code=303,
             )
 
@@ -564,7 +655,7 @@ async def inicis_return(
             db.commit()
 
             return RedirectResponse(
-                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code={quote((approve_data or {}).get('resultCode', 'APPROVE_FAIL'))}",
+                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?{build_payment_fail_query(mode='fail', code=(approve_data or {}).get('resultCode', 'APPROVE_FAIL'), free_return_url=free_return_url, free_token=free_token)}",
                 status_code=303,
             )
 
@@ -597,7 +688,7 @@ async def inicis_return(
             db.commit()
 
             return RedirectResponse(
-                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=MISSING_REPORT_TOKEN",
+                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?{build_payment_fail_query(mode='fail', code='MISSING_REPORT_TOKEN', free_return_url=free_return_url, free_token=free_token)}",
                 status_code=303,
             )
 
