@@ -388,6 +388,7 @@
     const API_BASE = "https://relationship-safe-guide-api.onrender.com";
     const ENTRY_URL = API_BASE + "/api/premium/entry";
     const HOME_URL = "https://reconnectlab.co.kr/";
+    const PAYMENT_FAIL_URL = HOME_URL.replace(/\/$/, "") + "/payment-fail";
     const STORAGE_KEY = "rl_premium_report_token";
     const FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
     const FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
@@ -666,6 +667,29 @@
       }
       debugLog("return.path.invalid", { reason: "no_valid_return_path" });
       return "";
+    }
+
+    function buildPaymentFailUrl(reason, token) {
+      const params = new URLSearchParams();
+      const returnUrl = resolveFreeReturnUrl();
+      const freeToken = getStoredFreeReportToken();
+      if (reason) params.set("reason", reason);
+      if (returnUrl) params.set("free_return_url", returnUrl);
+      if (freeToken) params.set("free_token", freeToken);
+      if (token) params.set("report_token", token);
+      return PAYMENT_FAIL_URL + (params.toString() ? ("?" + params.toString()) : "");
+    }
+
+    function redirectToPaymentFail(reason, token) {
+      const targetUrl = buildPaymentFailUrl(reason, token);
+      debugLog("premium.not_paid.redirect_payment_fail", {
+        token: token || "",
+        targetUrl: targetUrl
+      });
+      debugLog("premium.not_paid.redirect_reason", { reason: reason || "not_paid" });
+      clearPolling("redirect_payment_fail");
+      resetFrame("redirect_payment_fail");
+      window.location.replace(targetUrl);
     }
 
     function hideReturnLink() {
@@ -1037,13 +1061,7 @@
           debugLog("payment.cancel", { token: token, nextUrl: data.next_url || "" });
           debugLog("payment.cancel_or_not_paid", { token: token, nextUrl: data.next_url || "" });
           debugLog("premium.state.not_paid", { token: token });
-          debugLog("return.path.selected", { source: "resolved_before_not_paid", url: resolveFreeReturnUrl() || "", fallbackUsed: false });
-          showState(
-            "결제가 필요합니다.",
-            data.user_message || "프리미엄 리포트를 보려면 결제를 완료해 주세요.",
-            "결제 진행하기",
-            data.next_url || ("/premium?token=" + encodeURIComponent(token))
-          );
+          redirectToPaymentFail("not_paid", token);
           return;
         }
 

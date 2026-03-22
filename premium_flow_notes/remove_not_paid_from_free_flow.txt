@@ -1,0 +1,43 @@
+1. free 흐름에서 NOT_PAID가 개입하던 실제 지점
+- premium wrapper `imweb/premium_report.html` 이 entry API 의 `NOT_PAID` 상태를 wrapper 내부 state UI 로 직접 렌더하고 있었다.
+- `/r/{token}` premium direct access 도 `NOT_PAID` 상태일 때 backend HTML 상태 페이지를 반환하고 있었다.
+- 이 두 경로 때문에 free 복귀 이후에도 premium 비결제 상태가 다시 화면에 개입할 수 있었다.
+
+2. NOT_PAID를 제거/우회한 파일 목록
+- imweb/imweb free-report.html
+- imweb/premium_report.html
+- app/services/premium_report.py
+- app/routes_report.py
+
+3. payment-fail로 단일화한 조건
+- premium entry 상태가 `NOT_PAID` 인 경우
+- premium token direct access(`/r/{token}`) 에서 premium flow token 이고 상태가 `NOT_PAID` 인 경우
+- 위 경우 모두 `payment-fail?reason=not_paid...` 로 우회한다.
+
+4. free는 어떤 상태만 렌더하게 바뀌었는지
+- free wrapper 는 free report 렌더만 담당한다.
+- premium/payment 상태 UI 는 free 화면에서 더 이상 표시하지 않는다.
+- free 진입 시 premium 상태 cleanup 은 유지한다.
+- 로그:
+  - free.enter
+  - free.cleanup.start
+  - free.cleanup.removed
+  - free.render.only
+
+5. premium에서 payment-fail로 보내는 기준
+- `resolve_premium_state()` 의 `NOT_PAID` 응답은 이제 next_url 을 `/payment-fail?reason=not_paid&report_token=...` 로 가진다.
+- premium wrapper 는 `NOT_PAID` 상태를 받으면 `premium.not_paid.redirect_payment_fail` 로그 후 즉시 payment-fail 로 이동한다.
+- `/r/{token}` backend 라우트도 `NOT_PAID` 면 HTML 상태 페이지 대신 payment-fail 로 redirect 한다.
+
+6. 테스트 시나리오
+- free -> 결제 시도 -> 취소 -> payment-fail
+  - premium wrapper 내부 NOT_PAID 화면 대신 payment-fail 로 가는지 확인
+- payment-fail -> 리포트 페이지로 돌아가기
+  - free wrapper 로 복귀 후 free.render.only 로그 확인
+- free에서 NOT_PAID 재노출 없는지
+  - free 화면에서 premium state UI 가 다시 보이지 않는지 확인
+- old premium token 직접 접근 시 처리 방식
+  - `/r/{old_premium_token}` 접근 시 payment-fail 로 이동하는지 확인
+
+7. 남은 리스크 1개
+- payment-fail 에서 free 복귀 URL 이 없는 오래된 세션은 홈 fallback 으로 갈 수 있다. 이 경우는 query 기반 복귀 정보가 충분히 전달되는지 실브라우저에서 다시 확인해야 한다.

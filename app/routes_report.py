@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from .db import SessionLocal
@@ -12,6 +12,7 @@ from .services.reporting.premium_renderer import (
 )
 
 router = APIRouter()
+PAYMENT_FAIL_URL = "https://reconnectlab.co.kr/payment-fail"
 
 
 def load_report_and_session_by_token(token: str, db: Session):
@@ -63,13 +64,9 @@ def resolve_report_html(token: str) -> HTMLResponse:
                 )
 
             if state.state == "NOT_PAID":
-                return HTMLResponse(
-                    render_premium_state_html(
-                        state="NOT_PAID",
-                        title="결제가 필요합니다",
-                        message=state.user_message,
-                    ),
-                    status_code=403,
+                return RedirectResponse(
+                    url=f"{PAYMENT_FAIL_URL}?reason=not_paid&report_token={token}",
+                    status_code=302,
                 )
 
             if state.state == "NEED_SURVEY":

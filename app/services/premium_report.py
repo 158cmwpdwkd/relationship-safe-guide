@@ -14,6 +14,8 @@ from app.services.reporting.premium_pipeline import (
     prepare_premium_report_payload,
 )
 
+PAYMENT_FAIL_PATH = "/payment-fail"
+
 
 def _get_report_by_token(*, report_token: str, db: Session) -> Report | None:
     return db.query(Report).filter(Report.report_token == report_token).first()
@@ -132,8 +134,8 @@ def resolve_premium_state(
             order_id=order.order_id if order else order_id,
             report_token=report_token,
             report_url=f"/r/{report_token}",
-            next_action="GO_PAYMENT",
-            next_url=f"/premium?token={report_token}",
+            next_action="SHOW_ERROR",
+            next_url=f"{PAYMENT_FAIL_PATH}?reason=not_paid&report_token={report_token}",
             user_message="결제가 필요합니다.",
         )
 

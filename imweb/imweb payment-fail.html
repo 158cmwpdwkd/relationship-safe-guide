@@ -329,6 +329,9 @@
     log("payment_fail.enter", {
       href: window.location.href
     });
+    log("payment_fail.reason", {
+      reason: getQueryValue("reason") || ""
+    });
 
     cleanupPremiumState();
 

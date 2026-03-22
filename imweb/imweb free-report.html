@@ -554,6 +554,7 @@
       hide(errorEl);
       show(frameWrapEl, "block");
       show(extrasEl, "block");
+      debugLog("free.render.only", { token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "" });
 
       setTimeout(() => {
         document.querySelectorAll(".fade-up").forEach(el => el.classList.add("in"));
