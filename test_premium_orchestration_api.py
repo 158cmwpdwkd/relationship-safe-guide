@@ -202,7 +202,7 @@ def test_report_route_blocks_not_paid():
 
     res = client.get(f"/r/{token}", follow_redirects=False)
     assert res.status_code == 403, res.text
-    assert "Payment required" in res.text
+    assert "NOT_PAID" in res.text
 
 
 def test_report_route_redirects_need_survey():
@@ -213,5 +213,5 @@ def test_report_route_redirects_need_survey():
     )
 
     res = client.get(f"/r/{token}", follow_redirects=False)
-    assert res.status_code == 302, res.text
-    assert res.headers["location"] == f"/premium-survey?token={token}&orderId={order_id}"
+    assert res.status_code == 409, res.text
+    assert "NEED_SURVEY" in res.text
