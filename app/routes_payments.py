@@ -339,6 +339,32 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
 
       <script>
         window.addEventListener("load", function () {{
+          console.debug("[RCL payment]", "payment.page.version", "2026-03-22-context-isolation-v1");
+          console.debug("[RCL payment]", "payment.context", {{
+            is_top_window: window.self === window.top,
+            current_url: window.location.href
+          }});
+
+          var removed = [];
+          ["rcl-nav", "rcl-main", "rcl-footer", "rcl-state", "rcl-report-outer"].forEach(function (id) {{
+            var node = document.getElementById(id);
+            if (node && node.parentNode) {{
+              removed.push(id);
+              node.parentNode.removeChild(node);
+            }}
+          }});
+          console.debug("[RCL payment]", "payment.free_dom.cleanup", {{ removed: removed }});
+
+          if (window.self !== window.top) {{
+            console.debug("[RCL payment]", "payment.fail.redirect.mode", "embedded_context_escape");
+            console.debug("[RCL payment]", "payment.fail.redirect.target", window.location.href);
+            console.debug("[RCL payment]", "payment.fail.redirect.top", true);
+            try {{
+              window.top.location.replace(window.location.href);
+              return;
+            }} catch (e) {{}}
+          }}
+
 if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
             console.debug("[RCL payment]", "payment.fail.redirect.mode", "script_load_fail");
             console.debug("[RCL payment]", "payment.fail.redirect.target", "{build_payment_fail_target(mode='fail', code='INICIS_SCRIPT_LOAD_FAIL', free_return_url=free_return_url, free_token=free_token)}");

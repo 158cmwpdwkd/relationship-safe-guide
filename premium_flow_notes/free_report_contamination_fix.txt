@@ -1,0 +1,57 @@
+1. free-report 페이지에 payment-fail UI가 섞이던 실제 원인
+- 현재 코드상 free-report.html 안에 payment-fail 전용 마크업이 직접 들어있는 것은 확인되지 않았다.
+- 다만 실제 반영 환경에서 혼합본이 올라갔거나 이전 DOM/페이지 조각이 남아 있을 가능성을 배제할 수 없어, free 페이지 진입 시 payment-fail 식별 DOM 을 제거하는 방어 로직을 추가했다.
+- 이제 free 페이지는 진입 즉시 payment-fail heading/CTA 흔적을 제거하고 free 렌더만 진행한다.
+
+2. payment-fail에서 free URL을 invalid 처리하던 원인
+- `payment-fail` 쪽 검증 규칙 자체는 `https://reconnectlab.co.kr/report?token=...` 를 차단하지 않는다.
+- invalid 판단의 실제 원인을 확정하기 위해 now logs:
+  - raw_url
+  - raw_token
+  - normalized(hostname/pathname/token)
+  - invalid reason
+- 특히 onrender 도메인, `/pay/start`, `/payment-fail`, `premium` path 만 invalid 로 남긴다.
+
+3. 수정한 파일 목록
+- imweb/imweb free-report.html
+- imweb/imweb payment-fail.html
+
+4. free-report에서 제거한 상태/UI 목록
+- payment-fail CTA (`무료리포트 다시 보기`) 가 붙은 `#returnBtn` 기반 DOM
+- `결제가 취소되었거나 실패했어요` heading 이 붙은 payment-fail card DOM
+- 관련 로그:
+  - free.render.payment_fail_removed
+  - free.render.premium_state_blocked
+  - free.render.only
+
+5. payment-fail의 valid/invalid URL 규칙
+- valid:
+  - `https://reconnectlab.co.kr/report?token=...`
+  - same-origin `/report?token=...`
+- invalid:
+  - token 없음
+  - hostname 이 `onrender.com`
+  - pathname 에 `/pay/start`
+  - pathname 에 `payment-fail`
+  - pathname 에 `premium`
+- 관련 로그:
+  - payment_fail.return_path.raw_url
+  - payment_fail.return_path.raw_token
+  - payment_fail.return_path.normalized
+  - payment_fail.return_path.invalid
+  - payment_fail.return_path.selected
+  - payment_fail.return_path.fallback_home
+  - payment_fail.return_cta.href
+
+6. 테스트 시나리오
+- 결제 취소 후 payment-fail 진입
+  - `payment_fail.page.version` 확인
+- 무료리포트 다시 보기 클릭
+  - `payment_fail.return_cta.href` 가 `https://reconnectlab.co.kr/report?token=...` 인지 확인
+- 주소창이 `reconnectlab.co.kr/report?token=...` 인지 확인
+- free 화면에서 payment-fail 카드가 사라졌는지 확인
+  - `free.page.version`
+  - `free.render.payment_fail_removed` 또는 `free.render.premium_state_blocked`
+  - `free.render.only`
+- 홈 fallback 이 사라졌는지 확인
+  - `payment_fail.return_path.invalid` 의 reason 과 `payment_fail.return_path.fallback_home` 여부 확인

@@ -147,6 +147,11 @@
       console.debug("[RCL payment-fail]", event, payload || {});
     }
 
+    log("payment_fail.page.version", {
+      version: "2026-03-22-payment-fail-v2",
+      href: window.location.href
+    });
+
     function getStored(key, storage) {
       try {
         return (storage || localStorage).getItem(key) || "";
@@ -176,6 +181,14 @@
         const token = parsed.searchParams.get("token");
         const pathname = (parsed.pathname || "").toLowerCase();
         const hostname = (parsed.hostname || "").toLowerCase();
+
+        log("payment_fail.return_path.normalized", {
+          rawUrl: rawUrl,
+          hostname: hostname,
+          pathname: pathname,
+          token: maskToken(token || ""),
+          normalizedCandidate: token ? (parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token)) : ""
+        });
 
         if (!token) return { ok: false, reason: "missing_token" };
         if (pathname.includes("/pay/start")) return { ok: false, reason: "pay_start_path" };

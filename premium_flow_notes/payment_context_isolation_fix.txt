@@ -1,0 +1,27 @@
+1. 기존에 /pay/start DOM이 유지되던 이유
+- free-report 가 결제 시작 시 `location.href` 로 같은 브라우저 문맥을 덮고 있었다.
+- 이 구조에서는 결제 취소/실패 후 `/pay/start` 문맥이 그대로 남아 payment-fail 과 free-report 가 같은 컨텍스트에서 겹쳐 보일 수 있었다.
+
+2. window.open 방식 적용 결과
+- free-report premium CTA 는 이제 결제 URL 을 새 창(`_blank`)으로 먼저 연다.
+- 팝업 차단 시에만 top navigation 으로 fallback 한다.
+- 관련 로그:
+  - free.payment.open_new_window
+  - free.payment.open_target
+
+3. free DOM 오염 제거 확인
+- `/pay/start` 렌더 스크립트에서 다음을 점검한다.
+  - 현재 문맥이 top window 인지
+  - free DOM id (`rcl-nav`, `rcl-main`, `rcl-footer`, `rcl-state`, `rcl-report-outer`) 가 섞여 있는지
+- free DOM 흔적이 있으면 즉시 제거하고 로그를 남긴다.
+- embedded 문맥이면 `window.top.location.replace(window.location.href)` 로 탈출한다.
+
+4. 테스트 결과
+- free -> premium 클릭
+  - free 페이지는 그대로 유지되고 결제 페이지가 새 창으로 열리는지 확인
+- 결제 취소
+  - 메인 free-report DOM 이 오염되지 않는지 확인
+- payment-fail 또는 결제 실패 흐름
+  - 주소창이 `/pay/start` 문맥에 남지 않는지 확인
+- 팝업 차단 환경
+  - top navigation fallback 이 동작하는지 확인

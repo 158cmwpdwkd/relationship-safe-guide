@@ -532,6 +532,11 @@
       console.debug("[RCL free wrapper]", event, payload || {});
     }
 
+    debugLog("free.page.version", {
+      version: "2026-03-22-free-render-only-v2",
+      href: window.location.href
+    });
+
     function hide(el) {
       if (!el) return;
       el.style.display = "none";
@@ -689,6 +694,38 @@
       debugLog("free.cleanup.removed", { removedKeys });
     }
 
+    function removePaymentFailArtifacts() {
+      const removed = [];
+
+      const returnBtn = document.getElementById("returnBtn");
+      if (returnBtn && /무료리포트 다시 보기/.test((returnBtn.textContent || "").trim())) {
+        const target = returnBtn.closest(".page") || returnBtn.closest(".card") || returnBtn;
+        if (target && target.parentNode) {
+          removed.push("returnBtn");
+          target.parentNode.removeChild(target);
+        }
+      }
+
+      const headings = Array.from(document.querySelectorAll("h1, h2, p"));
+      headings.forEach((node) => {
+        const text = (node.textContent || "").trim();
+        if (!text) return;
+        if (text.indexOf("결제가 취소되었거나 실패했어요") >= 0) {
+          const target = node.closest(".page") || node.closest(".card") || node;
+          if (target && target.parentNode) {
+            removed.push("payment_fail_heading");
+            target.parentNode.removeChild(target);
+          }
+        }
+      });
+
+      if (removed.length) {
+        debugLog("free.render.payment_fail_removed", { removed: removed });
+      } else {
+        debugLog("free.render.premium_state_blocked", { removed: [] });
+      }
+    }
+
     function getReportToken() {
       return getQueryToken() || getPathToken() || getStoredToken() || "";
     }
@@ -698,6 +735,7 @@
       token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "",
       href: window.location.href
     });
+    removePaymentFailArtifacts();
     cleanupPremiumState();
 
     if (!token) {
@@ -841,7 +879,16 @@
         });
         debugLog("free.premium_cta.href", { href: url.toString() });
 
-        window.location.href = url.toString();
+        const payUrl = url.toString();
+        const opened = window.open(payUrl, "_blank", "noopener,noreferrer");
+        if (opened && !opened.closed) {
+          debugLog("free.payment.open_new_window", { opened: true });
+          debugLog("free.payment.open_target", { target: "_blank", href: payUrl });
+        } else {
+          debugLog("free.payment.open_failed", { href: payUrl, reason: "popup_blocked" });
+          debugLog("free.payment.popup_blocked", { href: payUrl });
+          alert("팝업이 차단되어 결제창을 열지 못했어요. 브라우저에서 팝업을 허용한 뒤 다시 눌러주세요.");
+        }
       } catch (error) {
         console.error("[RCL] goPremiumPay redirect error:", error);
         alert("결제 페이지로 이동하지 못했어요. 잠시 후 다시 시도해주세요.");
