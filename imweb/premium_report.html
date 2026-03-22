@@ -374,8 +374,10 @@
     const API_BASE = "https://relationship-safe-guide-api.onrender.com";
     const ENTRY_URL = API_BASE + "/api/premium/entry";
     const HOME_URL = "https://reconnectlab.co.kr/";
-    const STORAGE_KEY = "rl_report_token";
+    const STORAGE_KEY = "rl_premium_report_token";
     const POLL_INTERVAL_MS = 3000;
+    const HEIGHT_DEBOUNCE_MS = 120;
+    const HEIGHT_MIN_DELTA = 18;
 
     const loadingEl = document.getElementById("rcl-loading");
     const errorEl = document.getElementById("rcl-error");
@@ -387,13 +389,34 @@
     const frameEl = document.getElementById("rcl-report-frame");
 
     let lastHeight = 0;
+    let pendingHeight = 0;
+    let heightRaf = 0;
+    let lastHeightAppliedAt = 0;
     let pollHandle = null;
+    let bootSeq = 0;
+    let activeFrameToken = "";
 
     function hideAll() {
       loadingEl.style.display = "none";
       errorEl.style.display = "none";
       stateEl.style.display = "none";
       frameWrapEl.style.display = "none";
+    }
+
+    function resetFrame() {
+      pendingHeight = 0;
+      if (heightRaf) {
+        cancelAnimationFrame(heightRaf);
+        heightRaf = 0;
+      }
+      lastHeight = 0;
+      lastHeightAppliedAt = 0;
+      activeFrameToken = "";
+      frameEl.classList.remove("loaded");
+      frameEl.style.height = "600px";
+      if (frameEl.src) {
+        frameEl.removeAttribute("src");
+      }
     }
 
     function showLoading(title, copy) {
@@ -405,11 +428,13 @@
 
     function showError() {
       hideAll();
+      resetFrame();
       errorEl.style.display = "flex";
     }
 
     function showState(title, copy, ctaLabel, ctaHref) {
       hideAll();
+      resetFrame();
       stateEl.style.display = "flex";
       stateTitleEl.textContent = title || "";
       stateCopyEl.textContent = copy || "";
@@ -425,7 +450,12 @@
     function showFrame(token) {
       hideAll();
       frameWrapEl.style.display = "block";
-      frameEl.src = API_BASE + "/r/" + encodeURIComponent(token) + "?v=" + Date.now();
+      if (activeFrameToken !== token) {
+        frameEl.classList.remove("loaded");
+        frameEl.style.height = "600px";
+        frameEl.src = API_BASE + "/r/" + encodeURIComponent(token);
+        activeFrameToken = token;
+      }
     }
 
     function getQueryToken() {
@@ -487,9 +517,39 @@
       }, POLL_INTERVAL_MS);
     }
 
+    function applyFrameHeight(target) {
+      pendingHeight = target;
+      if (heightRaf) return;
+
+      heightRaf = requestAnimationFrame(function () {
+        heightRaf = 0;
+
+        const now = Date.now();
+        if ((now - lastHeightAppliedAt) < HEIGHT_DEBOUNCE_MS) {
+          setTimeout(function () {
+            applyFrameHeight(pendingHeight);
+          }, HEIGHT_DEBOUNCE_MS - (now - lastHeightAppliedAt));
+          return;
+        }
+
+        const next = pendingHeight;
+        pendingHeight = 0;
+
+        if (!next) return;
+        if (Math.abs(next - lastHeight) <= HEIGHT_MIN_DELTA) return;
+        if (next < lastHeight && (lastHeight - next) < 96) return;
+
+        frameEl.style.height = next + "px";
+        lastHeight = next;
+        lastHeightAppliedAt = Date.now();
+      });
+    }
+
     async function boot(initialToken) {
+      const seq = ++bootSeq;
       const token = initialToken || getToken();
       if (!token) {
+        clearPolling();
         showError();
         return;
       }
@@ -499,6 +559,7 @@
 
       try {
         const data = await fetchEntry(token);
+        if (seq !== bootSeq) return;
         const state = data.state || "";
 
         if (state === "INVALID_REPORT_TOKEN") {
@@ -547,6 +608,7 @@
         clearPolling();
         showError();
       } catch (e) {
+        if (seq !== bootSeq) return;
         clearPolling();
         showError();
       }
@@ -570,11 +632,8 @@
       if (!data || data.type !== "RCL_REPORT_HEIGHT") return;
       if (typeof data.height !== "number" || data.height <= 0) return;
 
-      const target = Math.min(Math.max(data.height + 96, 760), 14000);
-      if (Math.abs(target - lastHeight) <= 6) return;
-
-      frameEl.style.height = target + "px";
-      lastHeight = target;
+      const target = Math.min(Math.max(data.height + 72, 720), 14000);
+      applyFrameHeight(target);
     });
 
     document.querySelector("#rcl-nav .logo").addEventListener("click", function (e) {

@@ -1,3 +1,23 @@
+﻿1. 현재 문제 원인 요약
+- 현재 premium 본문은 renderer 내부 .wrap 최대폭이 680px로 고정되어 있어 PC에서도 전체 본문 폭이 모바일에 가까웠습니다.
+- metrics-grid는 이미 2열 정의가 있었지만, 부모 폭이 좁아 실제 체감상 모바일 단일 컬럼처럼 보였습니다.
+- 색상 토큰이 상대적으로 밝은 블루 계열에 가까워 초기 의도한 dark navy + rose/gold 톤보다 차갑게 보였습니다.
+- 본문 h2에 border-top이 들어가 있어 리포트보다 문서/위키 같은 분절 느낌이 강했습니다.
+
+2. 수정된 레이아웃 구조
+- report-shell 역할은 기존 .wrap이 유지하되 최대폭을 1088px로 확장했습니다.
+- 상단 metrics-grid는 desktop에서 2열, mobile(680px 이하)에서 1열로 유지했습니다.
+- hero, content, help-card, metric-card는 넓은 desktop canvas 기준 패딩과 간격을 다시 조정했습니다.
+- 본문 section 분리는 선(border-top) 대신 heading margin과 paragraph spacing으로 처리했습니다.
+
+3. 수정된 색상 토큰
+- 배경: #09111F / #101A2E / #131D33 / #18243D
+- 텍스트: #F5EFE8
+- 보조 텍스트: #93A1B5
+- 포인트: rose #C88968, rose light #E1B08D, gold #D9B46D
+- 카드/라인: warm rose 기반 rgba로 조정
+
+4. 수정된 premium_renderer.py 전체 코드
 from __future__ import annotations
 
 from html import escape
@@ -343,13 +363,12 @@ body{
 }
 @media (max-width:680px){
   .report-root{padding:16px 0 8px}
-  .wrap{padding:18px 12px 44px}
-  .hero{padding:20px 16px 18px}
+  .wrap{padding:22px 16px 52px}
+  .hero{padding:24px 20px 20px}
   .hero-title{font-size:22px}
-  .content{padding:22px 16px 28px}
+  .content{padding:24px 20px 30px}
   .content h1{font-size:24px}
   .content h2{font-size:19px;margin:30px 0 12px}
-  .help-card{padding:18px}
   .metrics-grid{grid-template-columns:1fr}
   .contact-grid{grid-template-columns:1fr}
 }
@@ -369,7 +388,7 @@ def _shell(inner_html: str, *, state: str) -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>프리미엄 리포트</title>
+  <title>?꾨━誘몄뾼 由ы룷??/title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
@@ -396,16 +415,12 @@ def _shell(inner_html: str, *, state: str) -> str:
   }}
 
   var lastSentHeight = 0;
-  var lastSentAt = 0;
   var rafId = 0;
   function sendHeight(force) {{
-    var now = Date.now();
     var h = calcHeight();
     if (!h) return;
-    if (!force && (now - lastSentAt) < 120) return;
     if (!force && Math.abs(h - lastSentHeight) <= 4) return;
     lastSentHeight = h;
-    lastSentAt = now;
     window.parent.postMessage({{ type: "RCL_REPORT_HEIGHT", height: h }}, "*");
   }}
 
@@ -548,12 +563,12 @@ def render_premium_report_html(markdown_text: str, metrics: dict | None = None) 
     <section class="hero">
       <div class="hero-top">
         <div>
-          <div class="hero-title">관계 진단 리포트</div>
-          <div class="hero-meta">분석 완료 · ReconnectLab</div>
+          <div class="hero-title">愿怨?吏꾨떒 由ы룷??/div>
+          <div class="hero-meta">遺꾩꽍 ?꾨즺 쨌 ReconnectLab</div>
         </div>
         <div class="hero-badge">PREMIUM</div>
       </div>
-      <div class="lead">무료 진단보다 더 구체적인 관계 해석과 행동 가이드를 정리한 프리미엄 리포트입니다.</div>
+      <div class="lead">臾대즺 吏꾨떒蹂대떎 ??援ъ껜?곸씤 愿怨??댁꽍怨??됰룞 媛?대뱶瑜??뺣━???꾨━誘몄뾼 由ы룷?몄엯?덈떎.</div>
     </section>
 
     {metrics_html}
@@ -563,33 +578,33 @@ def render_premium_report_html(markdown_text: str, metrics: dict | None = None) 
     </main>
 
     <section class="help-card">
-      <div class="help-title">도움이 더 필요할 때</div>
+      <div class="help-title">?꾩??????꾩슂????/div>
       <div class="contact-grid">
         <div class="contact-card">
           <div class="contact-num">117</div>
-          <div class="contact-label">스토킹·피해 상담전화</div>
+          <div class="contact-label">?ㅽ넗?뮤룻뵾???곷떞?꾪솕</div>
         </div>
         <div class="contact-card">
           <div class="contact-num">1577-0199</div>
-          <div class="contact-label">정신건강 위기상담전화</div>
+          <div class="contact-label">?뺤떊嫄닿컯 ?꾧린?곷떞?꾪솕</div>
         </div>
       </div>
     </section>
 
     <div class="footer">
-      본 리포트는 감정 자극이 아니라 안전 중심의 행동 가이드를 목적으로 제공합니다.
+      蹂?由ы룷?몃뒗 媛먯젙 ?먭레???꾨땲???덉쟾 以묒떖???됰룞 媛?대뱶瑜?紐⑹쟻?쇰줈 ?쒓났?⑸땲??
     </div>
   </div>
 """
     return _shell(inner_html, state="READY")
 
 
-def render_premium_processing_html(*, message: str = "프리미엄 리포트를 생성 중입니다.") -> str:
+def render_premium_processing_html(*, message: str = "?꾨━誘몄뾼 由ы룷?몃? ?앹꽦 以묒엯?덈떎.") -> str:
     inner_html = f"""
   <div class="state-wrap">
     <section class="state-card">
       <div class="state-badge">PROCESSING</div>
-      <div class="state-title">리포트를 생성하는 중입니다</div>
+      <div class="state-title">由ы룷?몃? ?앹꽦?섎뒗 以묒엯?덈떎</div>
       <div class="state-copy">{escape(message)}</div>
     </section>
   </div>
@@ -620,3 +635,10 @@ def render_premium_state_html(
   </div>
 """
     return _shell(inner_html, state=state)
+
+
+5. 적용 후 기대 레이아웃 설명
+- PC에서는 리포트 캔버스가 넓어지면서 상단 4개 지표 카드가 2x2 grid로 보입니다.
+- metric card는 더 어두운 navy 계열 배경 위에 rose/gold 포인트만 남겨 premium 톤이 강해집니다.
+- 본문은 구분선 없이 큰 여백과 타이포 계층으로 section이 나뉘어 문서보다 분석 리포트에 가까운 인상이 됩니다.
+- 모바일에서는 기존처럼 1열로 자연스럽게 내려가고, height postMessage 동작은 그대로 유지됩니다.
