@@ -127,7 +127,7 @@
       <div class="icon">!</div>
       <h1>결제가 취소되었거나 실패했어요</h1>
       <p>무료리포트는 다시 확인할 수 있어요. 아래 버튼을 눌러 이전 결과로 돌아가세요.</p>
-      <a id="returnBtn" class="btn" href="/">무료리포트 다시 보기</a>
+      <a id="returnBtn" class="btn" href="/" target="_top">무료리포트 다시 보기</a>
       <div class="hint">결제는 완료되지 않았어요.</div>
     </section>
   </main>
@@ -332,8 +332,20 @@
     log("payment_fail.reason", {
       reason: getQueryValue("reason") || ""
     });
+    log("payment_fail.context", {
+      is_top_window: window.self === window.top,
+      current_url: window.location.href,
+      referrer: document.referrer || ""
+    });
 
     cleanupPremiumState();
+
+    if (window.self !== window.top) {
+      try {
+        window.top.location.replace(window.location.href);
+        return;
+      } catch (e) {}
+    }
 
     const returnUrl = resolveReturnUrl();
     returnBtn.href = returnUrl;
@@ -342,7 +354,14 @@
     returnBtn.addEventListener("click", function (event) {
       event.preventDefault();
       log("payment_fail.return_cta.click", { url: returnUrl });
-      window.location.assign(returnUrl);
+      log("payment_fail.return_cta.target_url", { url: returnUrl });
+      try {
+        log("payment_fail.return_cta.navigate_top", { url: returnUrl });
+        window.top.location.href = returnUrl;
+      } catch (e) {
+        log("payment_fail.return_cta.navigate_self", { url: returnUrl });
+        window.location.href = returnUrl;
+      }
     });
   </script>
 </body>

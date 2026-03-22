@@ -1,0 +1,37 @@
+1. 주소창이 /pay/start?...로 남았던 실제 원인
+- `/api/payments/inicis/close` 와 `/api/payments/inicis/exit` 가 실제 HTTP redirect 가 아니라 HTML+script 치환 응답을 반환하고 있었다.
+- 이 방식에서는 현재 결제 문맥(`/pay/start` 페이지나 overlay/popup 문맥) 안에서만 화면이 바뀌고, 주소창이 top-level `payment-fail` 로 바뀌지 않을 수 있었다.
+
+2. payment-fail을 top-level page로 열리게 하기 위해 수정한 위치
+- app/routes_payments.py
+  - `_render_client_return_page()` 를 HTML 응답에서 `RedirectResponse(303)` 로 변경
+  - close/exit/fail 흐름이 최종적으로 `https://reconnectlab.co.kr/payment-fail?...` 로 서버 redirect 되게 정리
+  - script load fail 도 `window.top.location.replace(...)` 우선으로 수정
+
+3. 버튼을 top navigation으로 바꾼 방식
+- imweb/imweb payment-fail.html
+  - CTA anchor 에 `target="_top"` 추가
+  - 클릭 시 우선 `window.top.location.href = selectedUrl`
+  - 실패 시 `window.location.href = selectedUrl`
+
+4. payment-fail이 embedded인지 확인하는 로그 항목
+- payment_fail.context
+  - is_top_window
+  - current_url
+  - referrer
+- payment_fail.return_cta.click
+- payment_fail.return_cta.navigate_top
+- payment_fail.return_cta.navigate_self
+- payment_fail.return_cta.target_url
+
+5. 수정한 파일 목록
+- app/routes_payments.py
+- imweb/imweb payment-fail.html
+
+6. 테스트 시나리오
+- free -> premium -> 결제 취소
+  - 주소창이 `reconnectlab.co.kr/payment-fail?...` 로 바뀌는지 확인
+- 무료리포트 다시 보기 클릭
+  - 주소창이 `reconnectlab.co.kr` free report canonical URL 로 바뀌는지 확인
+- free report 정상 렌더 확인
+  - onrender `/pay/start?...` 주소가 더 이상 남지 않는지 확인

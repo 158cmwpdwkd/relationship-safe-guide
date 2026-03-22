@@ -64,89 +64,15 @@ def build_payment_fail_target(*, free_return_url: str = "", free_token: str = ""
     return f"{PAYMENT_FAIL_URL}?{query}" if query else PAYMENT_FAIL_URL
 
 
-def _render_client_return_page(*, mode: str, code: str = "", msg: str = "", free_return_url: str = "", free_token: str = "") -> HTMLResponse:
-    safe_mode = (mode or "cancel").strip().lower()
-    safe_code = quote(code or "")
-    safe_msg = quote(msg or "")
-    safe_free_return_url = quote(free_return_url or "", safe="")
-    safe_free_token = quote(free_token or "", safe="")
-    return HTMLResponse(
-        content=f"""
-        <!doctype html>
-        <html lang="ko">
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>결제 처리 중</title>
-        </head>
-        <body>
-          <script>
-            (function () {{
-              var PAYMENT_FAIL_URL = "{PAYMENT_FAIL_URL}";
-              var mode = "{safe_mode}";
-              var code = decodeURIComponent("{safe_code}");
-              var msg = decodeURIComponent("{safe_msg}");
-              var freeReturnUrl = decodeURIComponent("{safe_free_return_url}");
-              var freeToken = decodeURIComponent("{safe_free_token}");
-
-              function log(event, payload) {{
-                console.debug("[RCL payment exit]", event, payload || {{}});
-              }}
-
-              function buildTargetUrl() {{
-                var params = new URLSearchParams();
-                if (mode) params.set("mode", mode);
-                if (code) params.set("code", code);
-                if (msg) params.set("msg", msg);
-                if (freeReturnUrl) params.set("free_return_url", freeReturnUrl);
-                if (freeToken) params.set("free_token", freeToken);
-                var qs = params.toString();
-                return qs ? PAYMENT_FAIL_URL + "?" + qs : PAYMENT_FAIL_URL;
-              }}
-
-              try {{
-                sessionStorage.setItem("rl_payment_last_mode", mode);
-                if (code) sessionStorage.setItem("rl_payment_last_code", code);
-                if (msg) sessionStorage.setItem("rl_payment_last_msg", msg);
-              }} catch (e) {{}}
-
-              if (mode === "cancel" || mode === "close") {{
-                log("payment.close.redirect", {{ mode: mode, code: code }});
-              }} else {{
-                log("payment.fail.redirect", {{ mode: mode, code: code }});
-              }}
-              log("payment.redirect.query_in", {{
-                free_return_url: freeReturnUrl || "",
-                free_token: freeToken ? (freeToken.slice(0, 4) + "..." + freeToken.slice(-4)) : ""
-              }});
-              log("payment.exit.redirect", {{ mode: mode, code: code }});
-
-              var targetUrl = buildTargetUrl();
-              log("payment.redirect.query_out", {{
-                free_return_url: freeReturnUrl || "",
-                free_token: freeToken ? (freeToken.slice(0, 4) + "..." + freeToken.slice(-4)) : ""
-              }});
-              log("payment.redirect.target", {{ url: targetUrl }});
-              log("payment.exit.query_out", {{
-                free_return_url: freeReturnUrl || "",
-                free_token: freeToken ? (freeToken.slice(0, 4) + "..." + freeToken.slice(-4)) : ""
-              }});
-
-              if (window.opener && !window.opener.closed) {{
-                try {{
-                  window.opener.location.replace(targetUrl);
-                  window.close();
-                  return;
-                }} catch (e) {{}}
-              }}
-
-              window.location.replace(targetUrl);
-            }})();
-          </script>
-        </body>
-        </html>
-        """
+def _render_client_return_page(*, mode: str, code: str = "", msg: str = "", free_return_url: str = "", free_token: str = "") -> RedirectResponse:
+    target_url = build_payment_fail_target(
+        free_return_url=free_return_url,
+        free_token=free_token,
+        code=code,
+        msg=msg,
+        mode=(mode or "cancel").strip().lower(),
     )
+    return RedirectResponse(url=target_url, status_code=303)
 
 
 def sha256_hex(text: str) -> str:
@@ -413,9 +339,16 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
 
       <script>
         window.addEventListener("load", function () {{
-          if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
+if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
+            console.debug("[RCL payment]", "payment.fail.redirect.mode", "script_load_fail");
+            console.debug("[RCL payment]", "payment.fail.redirect.target", "{build_payment_fail_target(mode='fail', code='INICIS_SCRIPT_LOAD_FAIL', free_return_url=free_return_url, free_token=free_token)}");
+            console.debug("[RCL payment]", "payment.fail.redirect.top", true);
             alert("결제 모듈을 불러오지 못했습니다.");
-            window.location.href = "{build_payment_fail_target(mode='fail', code='INICIS_SCRIPT_LOAD_FAIL', free_return_url=free_return_url, free_token=free_token)}";
+            try {{
+              window.top.location.replace("{build_payment_fail_target(mode='fail', code='INICIS_SCRIPT_LOAD_FAIL', free_return_url=free_return_url, free_token=free_token)}");
+            }} catch (e) {{
+              window.location.replace("{build_payment_fail_target(mode='fail', code='INICIS_SCRIPT_LOAD_FAIL', free_return_url=free_return_url, free_token=free_token)}");
+            }}
             return;
           }}
           INIStdPay.pay("inicisPayForm");
