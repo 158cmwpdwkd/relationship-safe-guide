@@ -1,0 +1,69 @@
+1. 결제 취소 URL을 명시적으로 만드는 것이 해결하는 문제
+
+- 존재하지 않는 `/payment-cancel`, `/payment-fail` 경로로 빠져 404가 나는 문제를 직접 해결한다.
+- 결제 취소/실패 시 브라우저에서
+  1. 저장된 free return URL
+  2. free report token 기반 URL
+  3. 홈
+  우선순위로 실제 존재하는 경로를 선택하도록 만들었다.
+
+2. 그것만으로 해결되지 않는 문제
+
+- premium `NOT_PAID` 상태 화면 자체의 잔여 높이/레이아웃 문제는 별도 이슈다.
+- 즉 404 제거와 free 복귀 안정화는 해결되지만, `NOT_PAID` 레이아웃이 다시 흔들린다면 그건 premium wrapper 내부 state 레이아웃 문제로 별도 추적해야 한다.
+
+3. 실제 취소 URL 생성 코드 위치
+
+- 서버
+  - `app/routes_payments.py`
+  - `render_inicis_html()` 내부 script load fail 이동 URL
+  - `@router.api_route("/api/payments/inicis/close")`
+  - `@router.get("/api/payments/inicis/exit")`
+  - `inicis_return()` 내부 fail redirect
+
+- 프론트
+  - `imweb/imweb free-report.html`
+    - free return URL 저장
+  - `imweb/premium_report.html`
+    - free return URL 선택 및 복귀 링크 사용
+
+4. 수정한 최종 우선순위 경로
+
+- 결제 취소/실패 exit page에서 최종 경로 선택:
+  1. `rl_free_report_return_url`
+  2. `rl_free_report_token` -> `/report?token=...`
+  3. `SERVICE_BASE_URL/`
+
+- `window.history.back()` 의존은 제거했다.
+- `document.referrer`는 premium 복귀 경로 선택에서 제거했다.
+
+5. free cleanup과 NOT_PAID 레이아웃의 관계
+
+- free cleanup
+  - premium token
+  - payment last mode/code/msg
+  를 지운다.
+- 이 cleanup은 free 재진입 시 premium 실패 찌꺼기가 다시 free 화면을 오염시키지 않게 한다.
+- 반면 `NOT_PAID` 레이아웃 문제는 premium wrapper 내부에서 state UI가 얼마나 안정적으로 정리되느냐의 문제라서 별도 축이다.
+
+6. 테스트 시나리오
+
+- 새 토큰 결제 취소
+  - 결제 close/fail 후 404가 없는지 확인
+  - `/api/payments/inicis/exit` 경유 후 free return URL로 복귀하는지 확인
+
+- 404 제거 확인
+  - 더 이상 `/payment-cancel`, `/payment-fail` 404가 발생하지 않는지 확인
+
+- free 복귀 확인
+  - free wrapper에서 원래 token 기준 report가 다시 열리는지 확인
+
+- old token NOT_PAID 진입
+  - premium wrapper가 `NOT_PAID` 상태로 진입하되 free 복귀 링크가 정상적으로 free URL을 가리키는지 확인
+
+- NOT_PAID 화면 높이 확인
+  - 404와 무관하게 state 화면 높이가 과하게 남는지 별도로 확인
+
+7. 남은 리스크 1개
+
+- imweb wrapper 일부 파일은 현재 터미널/콘솔 출력에서 인코딩이 깨져 보여, 실제 브라우저 표시 문구는 한 번 더 확인해야 한다. 다만 경로 선택과 상태 cleanup 로직은 이번 라운드에서 분리 정리되었다.

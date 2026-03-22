@@ -516,12 +516,21 @@
     const PAYMENT_START_URL = API_BASE + "/pay/start";
     const HOME_URL = "https://reconnectlab.co.kr/";
     const REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
+    const FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
+    const PREMIUM_TOKEN_STORAGE_KEY = "rl_premium_report_token";
+    const PAYMENT_LAST_MODE_KEY = "rl_payment_last_mode";
+    const PAYMENT_LAST_CODE_KEY = "rl_payment_last_code";
+    const PAYMENT_LAST_MSG_KEY = "rl_payment_last_msg";
 
     const loadingEl   = document.getElementById("rcl-loading");
     const errorEl     = document.getElementById("rcl-error");
     const frameWrapEl = document.getElementById("rcl-frame-wrap");
     const frameEl     = document.getElementById("rcl-report-frame");
     const extrasEl    = document.getElementById("rcl-extras");
+
+    function debugLog(event, payload) {
+      console.debug("[RCL free wrapper]", event, payload || {});
+    }
 
     function hide(el) {
       if (!el) return;
@@ -586,16 +595,63 @@
       } catch (e) {}
     }
 
+    function setPremiumReturnUrl(url) {
+      try {
+        if (url) {
+          localStorage.setItem(FREE_RETURN_URL_STORAGE_KEY, url);
+        }
+      } catch (e) {}
+    }
+
+    function normalizeFreeReturnUrl(url) {
+      try {
+        const parsed = new URL(url, window.location.origin);
+        const token = parsed.searchParams.get("token");
+        if (!token) return "";
+        return parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token);
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function cleanupPremiumState() {
+      try {
+        localStorage.removeItem(PREMIUM_TOKEN_STORAGE_KEY);
+      } catch (e) {}
+      try {
+        sessionStorage.removeItem(PAYMENT_LAST_MODE_KEY);
+        sessionStorage.removeItem(PAYMENT_LAST_CODE_KEY);
+        sessionStorage.removeItem(PAYMENT_LAST_MSG_KEY);
+      } catch (e) {}
+      debugLog("free.cleanup.premium_state", {
+        removedKeys: [
+          PREMIUM_TOKEN_STORAGE_KEY,
+          PAYMENT_LAST_MODE_KEY,
+          PAYMENT_LAST_CODE_KEY,
+          PAYMENT_LAST_MSG_KEY
+        ]
+      });
+    }
+
     function getReportToken() {
       return getQueryToken() || getPathToken() || getStoredToken() || "";
     }
 
     const token = getReportToken();
+    debugLog("free.enter", {
+      token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "",
+      href: window.location.href
+    });
+    cleanupPremiumState();
 
     if (!token) {
       showError();
     } else {
       setStoredToken(token);
+      setPremiumReturnUrl(normalizeFreeReturnUrl(window.location.href));
+      debugLog("free.return.enter", {
+        returnUrl: normalizeFreeReturnUrl(window.location.href)
+      });
 
       frameEl.src = API_BASE + "/r/" + encodeURIComponent(token) + "?v=" + Date.now();
 
@@ -673,6 +729,7 @@
       if (e) e.preventDefault();
 
       const reportToken = getReportToken();
+      const currentFreeUrl = window.location.href;
 
       if (!reportToken) {
         alert("리포트 연결 정보(token)를 찾을 수 없어요. 처음부터 다시 진행해주세요.");
@@ -688,6 +745,13 @@
       const originalText = btn ? btn.innerHTML : "";
 
       try {
+        const normalizedReturnUrl = normalizeFreeReturnUrl(currentFreeUrl);
+        setPremiumReturnUrl(normalizedReturnUrl);
+        debugLog("free.cta.to_premium", {
+          returnUrl: normalizedReturnUrl,
+          reportToken: reportToken ? (reportToken.slice(0, 4) + "..." + reportToken.slice(-4)) : ""
+        });
+
         if (btn) {
           btn.style.pointerEvents = "none";
           btn.style.opacity = "0.7";

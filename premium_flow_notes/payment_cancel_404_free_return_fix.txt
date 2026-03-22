@@ -1,0 +1,79 @@
+1. 404의 실제 원인
+
+- 결제 close 응답이 `SERVICE_BASE_URL/payment-cancel`로 이동하고 있었는데, 이 경로가 실제로 준비되지 않은 환경에서 404로 떨어질 수 있었다.
+- 이번 수정에서 결제 close 응답은
+  - `window.history.back()`
+  - 실패 시 `SERVICE_BASE_URL/`
+  순으로 처리하게 바꿨다.
+
+2. free/premium 상태 오염 원인
+
+- free wrapper에서 premium 진입 전에 저장하는 복귀 정보는 있었지만, free 재진입 시 premium 전용 임시 상태를 명시적으로 지우지 않고 있었다.
+- premium wrapper는 `document.referrer`까지 fallback으로 사용하고 있어, 잘못된 premium/payment URL이 free 복귀 경로로 다시 채택될 수 있었다.
+
+3. 수정한 저장 키/초기화 규칙
+
+- free
+  - `rl_free_report_token`
+  - `rl_free_report_return_url`
+
+- premium
+  - `rl_premium_report_token`
+
+- free 페이지 진입 시 수행
+  - `free.enter`
+  - `free.cleanup.premium_state`
+  - `rl_premium_report_token` 제거
+  - 현재 free URL을 token 기준으로 정규화해서 `rl_free_report_return_url` 저장
+
+- premium 페이지 진입 시 수행
+  - `premium.enter`
+  - `premium.clear_polling`
+  - `premium.reset_frame`
+  - premium runtime 상태 초기화 후 다시 시작
+
+4. 복귀 URL 결정 규칙
+
+- premium wrapper는 이제 아래 순서로만 free 복귀 URL을 고른다.
+  1. `rl_free_report_return_url`을 정규화해서 유효하면 사용
+  2. 없으면 `rl_free_report_token`으로 `/report?token=...` 생성
+  3. `document.referrer`는 더 이상 사용하지 않음
+
+- 관련 로그
+  - `return.path.raw`
+  - `return.path.normalized`
+  - `return.path.selected`
+  - `return.path.invalid`
+
+5. free 페이지 재진입 시 수행되는 cleanup
+
+- `free.enter`
+- `free.cleanup.premium_state`
+- premium token 제거
+- free token 기준 새 렌더 시작
+- free return URL 재저장
+- premium 상태 화면이나 premium session을 free 쪽에서 다시 참조하지 않음
+
+6. 테스트 시나리오
+
+- 무료리포트 -> 결제 -> 취소
+  - 결제 close 후 404 대신 이전 free 화면 또는 홈으로 복귀하는지 확인
+  - premium으로 들어간 경우 `payment.cancel`, `premium.state.not_paid` 로그 확인
+
+- 취소 후 404 없는지
+  - `/payment-cancel` 404가 더 이상 보이지 않는지 확인
+
+- 무료리포트 링크 재접근
+  - free wrapper 진입 시 `free.enter`, `free.cleanup.premium_state`, `free.return.enter` 로그 확인
+  - premium `NOT_PAID` 성격 화면이 다시 보이지 않는지 확인
+
+- 재접근 후 premium 상태 미노출
+  - free report iframe과 extras만 정상 표시되는지 확인
+
+- 이후 premium 재진입 가능 여부
+  - free CTA를 다시 눌러 결제 진입 가능한지 확인
+  - 이전 premium 실패 상태가 free 페이지를 오염시키지 않는지 확인
+
+7. 남은 리스크 1개
+
+- imweb wrapper 파일 자체가 현재 콘솔/터미널에서 인코딩이 깨져 보이는 구간이 있어, 실제 브라우저 표시 문구는 별도로 한 번 더 확인이 필요하다. 다만 이번 라운드의 핵심은 경로/저장키 분리와 404 제거다.

@@ -35,6 +35,86 @@ class PreparePaymentIn(BaseModel):
     buyerTel: Optional[str] = "010-0000-0000"
 
 
+def _render_client_return_page(*, mode: str, code: str = "", msg: str = "") -> HTMLResponse:
+    safe_mode = (mode or "cancel").strip().lower()
+    safe_code = quote(code or "")
+    safe_msg = quote(msg or "")
+    return HTMLResponse(
+        content=f"""
+        <!doctype html>
+        <html lang="ko">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>결제 처리 중</title>
+        </head>
+        <body>
+          <script>
+            (function () {{
+              var HOME_URL = "{SERVICE_BASE_URL}/";
+              var FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
+              var FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
+              var mode = "{safe_mode}";
+              var code = decodeURIComponent("{safe_code}");
+              var msg = decodeURIComponent("{safe_msg}");
+
+              function getStored(key) {{
+                try {{
+                  return localStorage.getItem(key) || "";
+                }} catch (e) {{
+                  return "";
+                }}
+              }}
+
+              function normalizeReturnUrl(rawUrl) {{
+                if (!rawUrl) return "";
+                try {{
+                  var parsed = new URL(rawUrl, window.location.origin);
+                  var token = parsed.searchParams.get("token");
+                  if (!token) return "";
+                  return parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token);
+                }} catch (e) {{
+                  return "";
+                }}
+              }}
+
+              function resolveTargetUrl() {{
+                var storedUrl = normalizeReturnUrl(getStored(FREE_RETURN_URL_STORAGE_KEY));
+                if (storedUrl) return storedUrl;
+
+                var freeToken = getStored(FREE_REPORT_TOKEN_STORAGE_KEY);
+                if (freeToken) {{
+                  return "{SERVICE_BASE_URL}/report?token=" + encodeURIComponent(freeToken);
+                }}
+
+                return HOME_URL;
+              }}
+
+              try {{
+                sessionStorage.setItem("rl_payment_last_mode", mode);
+                if (code) sessionStorage.setItem("rl_payment_last_code", code);
+                if (msg) sessionStorage.setItem("rl_payment_last_msg", msg);
+              }} catch (e) {{}}
+
+              var targetUrl = resolveTargetUrl();
+
+              if (window.opener && !window.opener.closed) {{
+                try {{
+                  window.opener.location.replace(targetUrl);
+                  window.close();
+                  return;
+                }} catch (e) {{}}
+              }}
+
+              window.location.replace(targetUrl);
+            }})();
+          </script>
+        </body>
+        </html>
+        """
+    )
+
+
 def sha256_hex(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -286,7 +366,7 @@ def render_inicis_html(form: dict) -> HTMLResponse:
         window.addEventListener("load", function () {{
           if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
             alert("결제 모듈을 불러오지 못했습니다.");
-            window.location.href = "{SERVICE_BASE_URL}/payment-fail?code=INICIS_SCRIPT_LOAD_FAIL";
+            window.location.href = "{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=INICIS_SCRIPT_LOAD_FAIL";
             return;
           }}
           INIStdPay.pay("inicisPayForm");
@@ -331,6 +411,7 @@ async def inicis_prepare(payload: PreparePaymentIn):
 
 @router.api_route("/api/payments/inicis/close", methods=["GET", "POST"], response_class=HTMLResponse)
 async def inicis_close():
+    return _render_client_return_page(mode="cancel")
     return HTMLResponse(
         content=f"""
         <!doctype html>
@@ -344,13 +425,22 @@ async def inicis_close():
             if (window.opener && !window.opener.closed) {{
               window.close();
             }} else {{
-              window.location.replace("{SERVICE_BASE_URL}/payment-cancel");
+              if (window.history.length > 1) {{
+                window.history.back();
+              }} else {{
+                window.location.replace("{SERVICE_BASE_URL}/");
+              }}
             }}
           </script>
         </body>
         </html>
         """
     )
+
+
+@router.get("/api/payments/inicis/exit", response_class=HTMLResponse)
+async def inicis_exit(mode: str = Query("cancel"), code: str = Query(""), msg: str = Query("")):
+    return _render_client_return_page(mode=mode, code=code, msg=msg)
 
 
 @router.post("/api/payments/inicis/return")
@@ -368,19 +458,19 @@ async def inicis_return(
 ):
     if resultCode != "0000":
         return RedirectResponse(
-            url=f"{SERVICE_BASE_URL}/payment-fail?code={quote(resultCode or 'AUTH_FAIL')}&msg={quote(resultMsg or '')}",
+            url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code={quote(resultCode or 'AUTH_FAIL')}&msg={quote(resultMsg or '')}",
             status_code=303,
         )
 
     if not all([mid, orderNumber, authToken, authUrl]):
         return RedirectResponse(
-            url=f"{SERVICE_BASE_URL}/payment-fail?code=INVALID_AUTH_RESULT",
+            url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=INVALID_AUTH_RESULT",
             status_code=303,
         )
 
     if not is_valid_inicis_auth_url(authUrl, idc_name):
         return RedirectResponse(
-            url=f"{SERVICE_BASE_URL}/payment-fail?code=INVALID_AUTH_URL",
+            url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=INVALID_AUTH_URL",
             status_code=303,
         )
 
@@ -389,7 +479,7 @@ async def inicis_return(
         order = db.query(Order).filter(Order.order_id == orderNumber).first()
         if not order:
             return RedirectResponse(
-                url=f"{SERVICE_BASE_URL}/payment-fail?code=ORDER_NOT_FOUND",
+                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=ORDER_NOT_FOUND",
                 status_code=303,
             )
 
@@ -459,7 +549,7 @@ async def inicis_return(
                     pass
 
             return RedirectResponse(
-                url=f"{SERVICE_BASE_URL}/payment-fail?code=APPROVE_HTTP_ERROR",
+                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=APPROVE_HTTP_ERROR",
                 status_code=303,
             )
 
@@ -486,7 +576,7 @@ async def inicis_return(
             db.commit()
 
             return RedirectResponse(
-                url=f"{SERVICE_BASE_URL}/payment-fail?code={quote((approve_data or {}).get('resultCode', 'APPROVE_FAIL'))}",
+                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code={quote((approve_data or {}).get('resultCode', 'APPROVE_FAIL'))}",
                 status_code=303,
             )
 
@@ -519,7 +609,7 @@ async def inicis_return(
             db.commit()
 
             return RedirectResponse(
-                url=f"{SERVICE_BASE_URL}/payment-fail?code=MISSING_REPORT_TOKEN",
+                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=MISSING_REPORT_TOKEN",
                 status_code=303,
             )
 

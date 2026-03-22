@@ -206,6 +206,15 @@
       font-size: 15px;
     }
 
+    .state-return-link{
+      display:none;
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--sub);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
     #rcl-frame-wrap{
       display:none;
       width:100%;
@@ -341,6 +350,7 @@
           <div id="rcl-state-title" class="state-title"></div>
           <div id="rcl-state-copy" class="state-copy"></div>
           <a id="rcl-state-cta" class="btn-grad state-cta" href="#" style="display:none;"></a>
+          <a id="rcl-state-return" class="state-return-link" href="#" style="display:none;">무료 리포트 다시 보기</a>
         </div>
 
         <div id="rcl-frame-wrap">
@@ -379,6 +389,8 @@
     const ENTRY_URL = API_BASE + "/api/premium/entry";
     const HOME_URL = "https://reconnectlab.co.kr/";
     const STORAGE_KEY = "rl_premium_report_token";
+    const FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
+    const FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
     const POLL_INTERVAL_MS = 3000;
     const HEIGHT_DEBOUNCE_MS = 160;
     const HEIGHT_MIN_DELTA = 24;
@@ -391,6 +403,7 @@
     const stateTitleEl = document.getElementById("rcl-state-title");
     const stateCopyEl = document.getElementById("rcl-state-copy");
     const stateCtaEl = document.getElementById("rcl-state-cta");
+    const stateReturnEl = document.getElementById("rcl-state-return");
     const frameWrapEl = document.getElementById("rcl-frame-wrap");
     let frameEl = document.getElementById("rcl-report-frame");
 
@@ -601,11 +614,84 @@
       return frameEl ? (frameEl.getAttribute("src") || "") : "";
     }
 
+    function getStoredFreeReturnUrl() {
+      try {
+        return localStorage.getItem(FREE_RETURN_URL_STORAGE_KEY) || "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function getStoredFreeReportToken() {
+      try {
+        return localStorage.getItem(FREE_REPORT_TOKEN_STORAGE_KEY) || "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function normalizeReturnUrl(rawUrl) {
+      debugLog("return.path.raw", { url: rawUrl || "" });
+      if (!rawUrl) {
+        debugLog("return.path.invalid", { reason: "empty" });
+        return "";
+      }
+      try {
+        const parsed = new URL(rawUrl, window.location.origin);
+        const token = parsed.searchParams.get("token");
+        if (!token) {
+          debugLog("return.path.invalid", { reason: "missing_token", url: parsed.toString() });
+          return "";
+        }
+        const normalized = parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token);
+        debugLog("return.path.normalized", { rawUrl: rawUrl, normalized: normalized });
+        return normalized;
+      } catch (e) {
+        debugLog("return.path.invalid", { reason: "parse_error", rawUrl: rawUrl });
+        return "";
+      }
+    }
+
+    function resolveFreeReturnUrl() {
+      const storedUrl = normalizeReturnUrl(getStoredFreeReturnUrl());
+      if (storedUrl) {
+        debugLog("return.path.selected", { source: "stored_url", url: storedUrl, fallbackUsed: false });
+        return storedUrl;
+      }
+      const freeToken = getStoredFreeReportToken();
+      if (freeToken) {
+        const fallback = HOME_URL.replace(/\/$/, "") + "/report?token=" + encodeURIComponent(freeToken);
+        debugLog("return.path.selected", { source: "stored_token", url: fallback, token: freeToken, fallbackUsed: true });
+        return fallback;
+      }
+      debugLog("return.path.invalid", { reason: "no_valid_return_path" });
+      return "";
+    }
+
+    function hideReturnLink() {
+      if (!stateReturnEl) return;
+      stateReturnEl.style.display = "none";
+      stateReturnEl.removeAttribute("href");
+    }
+
+    function updateReturnLink() {
+      if (!stateReturnEl) return;
+      const returnUrl = resolveFreeReturnUrl();
+      if (!returnUrl) {
+        hideReturnLink();
+        return;
+      }
+      stateReturnEl.href = returnUrl;
+      stateReturnEl.style.display = "inline-block";
+      debugLog("return.cta.ready", { url: returnUrl });
+    }
+
     function hideAll() {
       loadingEl.style.display = "none";
       errorEl.style.display = "none";
       stateEl.style.display = "none";
       frameWrapEl.style.display = "none";
+      frameWrapEl.style.height = "0px";
     }
 
     function clearPolling(reason) {
@@ -667,6 +753,7 @@
         frameEl.classList.remove("loaded");
         frameEl.style.height = "600px";
       }
+      frameWrapEl.style.height = "0px";
       recreateFrame(reason || "resetFrame");
     }
 
@@ -687,6 +774,7 @@
     function showLoading(title, copy) {
       prepareState("PROCESSING", { keepFrame: false, reason: "showLoading" });
       debugLog("showLoading", { title: title || defaultLoadingTitle });
+      hideReturnLink();
       loadingEl.style.display = "flex";
       loadingEl.querySelector(".state-title").textContent = title || defaultLoadingTitle;
       loadingEl.querySelector(".state-copy").textContent = copy || defaultLoadingCopy;
@@ -695,6 +783,7 @@
     function showError() {
       prepareState("ERROR", { keepFrame: false, reason: "showError" });
       debugLog("showError");
+      hideReturnLink();
       errorEl.style.display = "flex";
     }
 
@@ -711,6 +800,7 @@
       } else {
         stateCtaEl.style.display = "none";
       }
+      updateReturnLink();
     }
 
     function showFrame(token) {
@@ -739,10 +829,12 @@
       activeFrameSessionId = ++frameSessionSeq;
       debugLog("frame.session.start", { sessionId: activeFrameSessionId, token: token, src: nextSrc });
       frameWrapEl.style.display = "block";
+      frameWrapEl.style.height = "";
       frameEl.style.height = "600px";
       frameEl.classList.remove("loaded");
       frameEl.src = nextSrc;
       activeFrameToken = token;
+      hideReturnLink();
     }
 
     function getQueryToken() {
@@ -774,6 +866,13 @@
       try {
         if (token) localStorage.setItem(STORAGE_KEY, token);
       } catch (e) {}
+    }
+
+    function cleanupPremiumRuntimeState() {
+      debugLog("premium.clear_polling", { reason: "enter" });
+      clearPolling("enter_cleanup");
+      debugLog("premium.reset_frame", { reason: "enter" });
+      resetFrame("enter_cleanup");
     }
 
     function getToken() {
@@ -897,6 +996,10 @@
 
     async function boot(initialToken) {
       const token = initialToken || getToken();
+      debugLog("premium.enter", {
+        token: token,
+        href: window.location.href
+      });
       if (!token) {
         debugLog("boot.skip", { reason: "missing_token" });
         clearPolling("missing_token");
@@ -912,6 +1015,7 @@
       const seq = ++bootSeq;
       entryInFlight = true;
       setStoredToken(token);
+      cleanupPremiumRuntimeState();
       showLoading(defaultLoadingTitle, defaultLoadingCopy);
 
       try {
@@ -930,6 +1034,10 @@
         }
 
         if (state === "NOT_PAID") {
+          debugLog("payment.cancel", { token: token, nextUrl: data.next_url || "" });
+          debugLog("payment.cancel_or_not_paid", { token: token, nextUrl: data.next_url || "" });
+          debugLog("premium.state.not_paid", { token: token });
+          debugLog("return.path.selected", { source: "resolved_before_not_paid", url: resolveFreeReturnUrl() || "", fallbackUsed: false });
           showState(
             "결제가 필요합니다.",
             data.user_message || "프리미엄 리포트를 보려면 결제를 완료해 주세요.",
@@ -1043,6 +1151,12 @@
       e.preventDefault();
       location.href = HOME_URL;
     });
+
+    if (stateReturnEl) {
+      stateReturnEl.addEventListener("click", function () {
+        debugLog("return.cta.click", { href: stateReturnEl.getAttribute("href") || "" });
+      });
+    }
 
     boot("");
   </script>
