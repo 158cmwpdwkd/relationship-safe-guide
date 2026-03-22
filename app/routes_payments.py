@@ -23,6 +23,7 @@ INICIS_SIGN_KEY = (os.getenv("INICIS_SIGN_KEY") or "").strip()
 SERVICE_BASE_URL = (os.getenv("SERVICE_BASE_URL") or "https://reconnectlab.co.kr").strip().rstrip("/")
 API_BASE_URL = (os.getenv("API_BASE_URL") or "https://relationship-safe-guide-api.onrender.com").strip().rstrip("/")
 PAYMENT_BASE_URL = (os.getenv("PAYMENT_BASE_URL") or API_BASE_URL).rstrip("/")
+PAYMENT_FAIL_URL = f"{SERVICE_BASE_URL}/payment-fail"
 
 PREMIUM_PRICE = int(os.getenv("PREMIUM_PRICE") or "29000")
 PREMIUM_GOODNAME = (os.getenv("PREMIUM_GOODNAME") or "리커넥트랩 프리미엄 AI 리포트").strip()
@@ -51,43 +52,22 @@ def _render_client_return_page(*, mode: str, code: str = "", msg: str = "") -> H
         <body>
           <script>
             (function () {{
-              var HOME_URL = "{SERVICE_BASE_URL}/";
-              var FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
-              var FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
+              var PAYMENT_FAIL_URL = "{PAYMENT_FAIL_URL}";
               var mode = "{safe_mode}";
               var code = decodeURIComponent("{safe_code}");
               var msg = decodeURIComponent("{safe_msg}");
 
-              function getStored(key) {{
-                try {{
-                  return localStorage.getItem(key) || "";
-                }} catch (e) {{
-                  return "";
-                }}
+              function log(event, payload) {{
+                console.debug("[RCL payment exit]", event, payload || {{}});
               }}
 
-              function normalizeReturnUrl(rawUrl) {{
-                if (!rawUrl) return "";
-                try {{
-                  var parsed = new URL(rawUrl, window.location.origin);
-                  var token = parsed.searchParams.get("token");
-                  if (!token) return "";
-                  return parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token);
-                }} catch (e) {{
-                  return "";
-                }}
-              }}
-
-              function resolveTargetUrl() {{
-                var storedUrl = normalizeReturnUrl(getStored(FREE_RETURN_URL_STORAGE_KEY));
-                if (storedUrl) return storedUrl;
-
-                var freeToken = getStored(FREE_REPORT_TOKEN_STORAGE_KEY);
-                if (freeToken) {{
-                  return "{SERVICE_BASE_URL}/report?token=" + encodeURIComponent(freeToken);
-                }}
-
-                return HOME_URL;
+              function buildTargetUrl() {{
+                var params = new URLSearchParams();
+                if (mode) params.set("mode", mode);
+                if (code) params.set("code", code);
+                if (msg) params.set("msg", msg);
+                var qs = params.toString();
+                return qs ? PAYMENT_FAIL_URL + "?" + qs : PAYMENT_FAIL_URL;
               }}
 
               try {{
@@ -96,7 +76,15 @@ def _render_client_return_page(*, mode: str, code: str = "", msg: str = "") -> H
                 if (msg) sessionStorage.setItem("rl_payment_last_msg", msg);
               }} catch (e) {{}}
 
-              var targetUrl = resolveTargetUrl();
+              if (mode === "cancel" || mode === "close") {{
+                log("payment.close.redirect", {{ mode: mode, code: code }});
+              }} else {{
+                log("payment.fail.redirect", {{ mode: mode, code: code }});
+              }}
+              log("payment.exit.redirect", {{ mode: mode, code: code }});
+
+              var targetUrl = buildTargetUrl();
+              log("payment.redirect.target", {{ url: targetUrl }});
 
               if (window.opener && !window.opener.closed) {{
                 try {{

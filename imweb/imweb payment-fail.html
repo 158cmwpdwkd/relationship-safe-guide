@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>리커넥트랩 | 결제 실패</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1626;
+      --card: #1a2540;
+      --line: rgba(212, 145, 108, 0.18);
+      --text: #f0ece8;
+      --sub: #9aaabb;
+      --rose: #d4916c;
+      --rose-strong: #be7d5a;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Noto Sans KR", sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 28px 22px 24px;
+      text-align: center;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
+    }
+
+    .icon {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(212, 145, 108, 0.08);
+      border: 1px solid rgba(212, 145, 108, 0.24);
+      color: var(--rose);
+      font-size: 26px;
+      font-weight: 800;
+    }
+
+    h1 {
+      font-size: 24px;
+      line-height: 1.35;
+      margin-bottom: 10px;
+      color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--sub);
+      margin-bottom: 20px;
+      word-break: keep-all;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 50px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--rose), var(--rose-strong));
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 6px 24px rgba(212, 145, 108, 0.25);
+    }
+
+    .hint {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #7f8da1;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 18px 12px;
+      }
+
+      .card {
+        padding: 24px 18px 20px;
+        border-radius: 16px;
+      }
+
+      h1 {
+        font-size: 21px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <div class="icon">!</div>
+      <h1>결제가 취소되었거나 실패했어요</h1>
+      <p>무료리포트는 다시 확인할 수 있어요. 아래 버튼을 눌러 이전 결과로 돌아가세요.</p>
+      <a id="returnBtn" class="btn" href="/">무료리포트 다시 보기</a>
+      <div class="hint">결제는 완료되지 않았어요.</div>
+    </section>
+  </main>
+
+  <script>
+    const HOME_URL = "https://reconnectlab.co.kr/";
+    const FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
+    const FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
+    const PREMIUM_TOKEN_STORAGE_KEY = "rl_premium_report_token";
+    const PAYMENT_LAST_MODE_KEY = "rl_payment_last_mode";
+    const PAYMENT_LAST_CODE_KEY = "rl_payment_last_code";
+    const PAYMENT_LAST_MSG_KEY = "rl_payment_last_msg";
+
+    const returnBtn = document.getElementById("returnBtn");
+
+    function log(event, payload) {
+      console.debug("[RCL payment-fail]", event, payload || {});
+    }
+
+    function getStored(key, storage) {
+      try {
+        return (storage || localStorage).getItem(key) || "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function removeStored(key, storage) {
+      try {
+        (storage || localStorage).removeItem(key);
+      } catch (e) {}
+    }
+
+    function normalizeReturnUrl(rawUrl) {
+      log("payment_fail.return_path.raw", { url: rawUrl || "" });
+      if (!rawUrl) return "";
+
+      try {
+        const parsed = new URL(rawUrl, window.location.origin);
+        const token = parsed.searchParams.get("token");
+        if (!token) return "";
+        return parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token);
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function resolveReturnUrl() {
+      const storedUrl = normalizeReturnUrl(getStored(FREE_RETURN_URL_STORAGE_KEY, localStorage));
+      if (storedUrl) {
+        log("payment_fail.return_path.selected", { source: "stored_url", url: storedUrl });
+        return storedUrl;
+      }
+
+      const freeToken = getStored(FREE_REPORT_TOKEN_STORAGE_KEY, localStorage);
+      if (freeToken) {
+        const url = HOME_URL.replace(/\/$/, "") + "/report?token=" + encodeURIComponent(freeToken);
+        log("payment_fail.return_path.selected", { source: "stored_token", url });
+        return url;
+      }
+
+      log("payment_fail.return_path.selected", { source: "home", url: HOME_URL });
+      return HOME_URL;
+    }
+
+    function cleanupPremiumState() {
+      removeStored(PREMIUM_TOKEN_STORAGE_KEY, localStorage);
+      removeStored(PAYMENT_LAST_MODE_KEY, sessionStorage);
+      removeStored(PAYMENT_LAST_CODE_KEY, sessionStorage);
+      removeStored(PAYMENT_LAST_MSG_KEY, sessionStorage);
+    }
+
+    log("payment_fail.enter", {
+      href: window.location.href
+    });
+
+    cleanupPremiumState();
+
+    const returnUrl = resolveReturnUrl();
+    returnBtn.href = returnUrl;
+
+    returnBtn.addEventListener("click", function () {
+      log("payment_fail.return_cta.click", { url: returnUrl });
+    });
+  </script>
+</body>
+</html>
