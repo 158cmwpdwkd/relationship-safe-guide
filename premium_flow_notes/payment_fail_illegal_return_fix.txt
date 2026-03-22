@@ -1,0 +1,23 @@
+1. top-level return이 왜 문제였는지
+- 일반 `<script>` 태그 최상위에서 `return;` 이 나오면 브라우저에서 `Illegal return statement` 구문 오류가 발생할 수 있다.
+- 이 경우 스크립트 전체가 중단되어 아래 로직이 모두 실행되지 않는다.
+  - `resolveReturnUrl()`
+  - `returnBtn.href = ctaUrl`
+  - `returnBtn.addEventListener(...)`
+
+2. 어떤 방식으로 parse error 가능성을 제거했는지
+- `imweb/imweb payment-fail.html` 의 스크립트 전체를 즉시실행함수(IIFE)로 감쌌다.
+- 이제 `if (window.self !== window.top) { ... return; }` 의 `return` 이 함수 내부에 있으므로 합법이다.
+
+3. 기본 href를 어떻게 바꿨는지
+- 위험한 기본값 `/` 대신 `javascript:void(0)` 로 변경
+- 이후 JS 에서 실제 free report URL 을 `returnBtn.href` 에 세팅
+
+4. 수정한 파일 목록
+- imweb/imweb payment-fail.html
+
+5. 테스트 시나리오
+- payment-fail 진입
+- 콘솔 에러 없는지 확인
+- `returnBtn.href` 확인
+- 버튼 클릭 시 free report 로 이동하는지 확인

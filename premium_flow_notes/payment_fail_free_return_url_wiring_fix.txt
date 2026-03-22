@@ -1,0 +1,26 @@
+1. 기존에 왜 `free_return_url`이 무시됐는지
+- `validateCanonicalFreeUrl(rawUrl)` 함수는 구현돼 있었지만, `resolveReturnUrl()` 안에서 실제 선택 분기에 연결되지 않았다.
+- 그래서 `query free_return_url` 는 로그만 찍히고, 실제 우선순위는 사실상 `query free_token -> storage free_token -> home` 으로 동작하고 있었다.
+
+2. 실제 누락된 연결 위치
+- `imweb/imweb payment-fail.html`
+- `resolveReturnUrl()` 내부
+- 누락 내용:
+  - `queryFreeReturnUrl` 를 `validateCanonicalFreeUrl()` 로 검증
+  - `ok === true` 시 selected URL 로 즉시 채택
+
+3. 수정 후 최종 우선순위
+- 1. query `free_return_url`
+- 2. query `free_token`
+- 3. storage `free_token`
+- 4. home
+- query `free_return_url` 가 valid 하면 이후 로직은 타지 않는다.
+
+4. 수정한 파일 목록
+- imweb/imweb payment-fail.html
+
+5. 테스트 시나리오
+- payment-fail URL 에 `free_return_url`, `free_token` 둘 다 있는 경우
+- `payment_fail.return_path.query_url_selected` 로그가 찍히는지 확인
+- CTA href 가 `free_return_url` 기반으로 잡히는지 확인
+- 클릭 시 `/report?token=...&from_payment_fail=1` 또는 `free_return_url + from_payment_fail=1` 로 이동하는지 확인

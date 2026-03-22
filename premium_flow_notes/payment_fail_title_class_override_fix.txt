@@ -1,0 +1,45 @@
+1. 수정한 파일 목록
+- `imweb/imweb payment-fail.html`
+
+2. 수정한 함수 목록
+- 없음
+- 이번 수정은 HTML 요소와 CSS class만 조정했습니다.
+
+3. 수정한 HTML 요소 목록
+- 메인 제목 요소
+  - 변경 전: `<h1>결제가 취소되었거나<br>실패했어요</h1>`
+  - 변경 후: `<h1 class="fail-title">결제가 취소되었거나 실패했어요</h1>`
+
+4. 추가한 class 이름
+- `.fail-title`
+
+5. 최종 제목 스타일 값
+- `font-size: 16px !important`
+- `line-height: 1.28 !important`
+- `font-weight: 700 !important`
+- `letter-spacing: -0.02em`
+- `margin-bottom: 12px`
+- `color: #fff`
+- `text-align: center`
+- `max-width: 260px`
+- `margin-left: auto`
+- `margin-right: auto`
+- `word-break: keep-all`
+- 모바일:
+  - `font-size: 15px !important`
+  - `max-width: 240px`
+
+6. 제거한 충돌 CSS 목록
+- 제목의 `<br>` 강제 줄바꿈 제거
+- 모바일에서 generic `h1`를 다시 크게 만드는 경로 제거 대신 `.fail-title`만 개별 제어
+- `viewport-shell`은 현재 `position: fixed`만 유지되는 상태로 확인
+
+7. 테스트 결과
+- 제목 크기는 generic `h1`가 아니라 `.fail-title`로 직접 제어되므로 이전보다 체감상 더 작게 보여야 합니다.
+- `<br>` 제거로 제목이 과장돼 보이던 줄바꿈 효과를 줄였습니다.
+- 모바일에서도 `.fail-title`만 15px로 내려 generic heading 재확대가 없도록 했습니다.
+- 버튼 동작 및 다른 카드 디자인 값은 수정하지 않았습니다.
+
+8. 남은 리스크
+- 아임웹 바깥 환경이 `h1`에 더 강한 selector를 주는 경우에도, 현재는 `.fail-title`의 `!important`로 대부분 방어되지만 인라인 스타일 수준 충돌은 별도 확인이 필요합니다.
+- 한글 인코딩이 배포 환경에서 다르게 들어가면 실제 텍스트 체감이 브라우저별로 약간 달라질 수 있습니다.

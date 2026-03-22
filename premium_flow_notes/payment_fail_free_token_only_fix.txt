@@ -1,0 +1,27 @@
+1. 왜 free_return_url 기반 복귀를 버렸는지
+- `free_return_url` 는 이미 query 에 들어와 있어도 검증/선택 로직이 여러 fallback 과 섞이면서 계속 꼬였다.
+- 반면 `free_token` 은 더 단순하고 안정적으로 canonical free report URL 을 재구성할 수 있다.
+
+2. free_token 기반 canonical URL 규칙
+- query `free_token` 이 있으면 무조건 아래 URL 생성:
+  - `https://reconnectlab.co.kr/report?token={free_token}&from_payment_fail=1`
+
+3. CTA href에 실제로 어떤 URL을 넣도록 바꿨는지
+- 위 canonical free report URL 을 렌더 시점에 그대로 `returnBtn.href` 에 세팅
+- 클릭 시에도 동일 URL 로 이동
+
+4. fallback 규칙
+- 1순위: query `free_token`
+- 2순위: storage `free_token`
+- 3순위: 홈
+- `free_return_url` 은 복귀 결정에는 사용하지 않고 로그용으로만 유지
+
+5. 수정한 파일 목록
+- imweb/imweb payment-fail.html
+
+6. 테스트 시나리오
+- 결제 취소 -> payment-fail
+- CTA href 확인
+- 무료리포트 다시 보기 클릭
+- `/report?token=...&from_payment_fail=1` 진입 확인
+- free cleanup 후 정상 렌더 확인

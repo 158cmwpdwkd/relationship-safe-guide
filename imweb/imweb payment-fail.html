@@ -13,146 +13,506 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0f1626;
-      --card: #1a2540;
-      --line: rgba(212, 145, 108, 0.18);
+      --bg: #0b1120;
+      --bg2: #0f1626;
+      --card: #15203a;
+      --card-inner: #1a2847;
+      --line: rgba(212, 145, 108, 0.15);
+      --line-strong: rgba(212, 145, 108, 0.28);
       --text: #f0ece8;
-      --sub: #9aaabb;
+      --sub: #8fa0b4;
+      --sub2: #6b7e94;
       --rose: #d4916c;
+      --rose-light: #e0a882;
       --rose-strong: #be7d5a;
+      --rose-dim: rgba(212, 145, 108, 0.10);
+      --rose-glow: rgba(212, 145, 108, 0.06);
+      --navy-light: #1e2d4a;
     }
 
     html, body {
+      width: 100%;
+      height: 100%;
       min-height: 100%;
+      margin: 0;
+      padding: 0;
       background: var(--bg);
       color: var(--text);
       font-family: "Noto Sans KR", sans-serif;
     }
 
+    /* ── 배경 그라디언트 & 글로우 (메인 사이트와 동일한 분위기) ── */
     body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px 16px;
-    }
-
-    .page {
       width: 100%;
-      max-width: 520px;
+      min-height: 100%;
+      position: relative;
+      overflow-x: hidden;
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 0%, rgba(212, 145, 108, 0.07) 0%, transparent 70%),
+        radial-gradient(ellipse 80% 60% at 20% 100%, rgba(15, 32, 68, 0.6) 0%, transparent 70%),
+        linear-gradient(160deg, #0b1120 0%, #0f1626 50%, #0c1830 100%);
     }
 
-    .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 28px 22px 24px;
-      text-align: center;
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
-    }
-
-    .icon {
-      width: 58px;
-      height: 58px;
-      margin: 0 auto 16px;
-      border-radius: 50%;
+    .viewport-shell {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      min-height: 100vh;
       display: grid;
       place-items: center;
-      background: rgba(212, 145, 108, 0.08);
-      border: 1px solid rgba(212, 145, 108, 0.24);
-      color: var(--rose);
-      font-size: 26px;
-      font-weight: 800;
+      padding: 32px 16px;
+      overflow-y: auto;
+      z-index: 1;
     }
 
-    h1 {
-      font-size: 24px;
-      line-height: 1.35;
-      margin-bottom: 10px;
+    .viewport-stack {
+      width: min(520px, calc(100vw - 32px));
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      margin: 0 auto;
+    }
+
+    /* 배경 장식 원 */
+    body::before {
+      content: "";
+      position: fixed;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 145, 108, 0.055) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      bottom: -80px;
+      right: -80px;
+      width: 340px;
+      height: 340px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(30, 50, 100, 0.35) 0%, transparent 65%);
+      pointer-events: none;
+    }
+
+    /* ── 상단 로고 ── */
+    .site-header {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 28px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      text-decoration: none;
+    }
+
+    .logo-mark {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--rose), var(--rose-strong));
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      font-weight: 800;
       color: #fff;
+      letter-spacing: -0.04em;
+      box-shadow: 0 3px 12px rgba(212, 145, 108, 0.35);
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
       letter-spacing: -0.02em;
     }
 
-    p {
-      font-size: 14px;
-      line-height: 1.75;
-      color: var(--sub);
-      margin-bottom: 20px;
+    .logo-text span {
+      color: var(--rose);
+    }
+
+    /* ── 메인 페이지 래퍼 ── */
+    .page {
+      width: 100%;
+      position: relative;
+      z-index: 1;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ── 카드 ── */
+    .card {
+      background: linear-gradient(145deg, #17253e 0%, #131f35 100%);
+      border: 1px solid var(--line-strong);
+      border-radius: 22px;
+      padding: 40px 32px 36px;
+      text-align: center;
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.35),
+        0 0 0 1px rgba(255, 255, 255, 0.03),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 카드 상단 글로우 라인 */
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 20%;
+      right: 20%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(212, 145, 108, 0.45), transparent);
+      pointer-events: none;
+    }
+
+    /* ── 아이콘 영역 ── */
+    .icon-wrap {
+      position: relative;
+      width: 68px;
+      height: 68px;
+      margin: 0 auto 22px;
+    }
+
+    /* 아이콘 글로우 링 */
+    .icon-wrap::before {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(212, 145, 108, 0.12) 0%, transparent 70%);
+    }
+
+    .icon {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, rgba(212, 145, 108, 0.12), rgba(212, 145, 108, 0.06));
+      border: 1.5px solid rgba(212, 145, 108, 0.32);
+      color: var(--rose);
+      position: relative;
+      box-shadow:
+        0 0 0 6px rgba(212, 145, 108, 0.05),
+        0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    /* SVG X 아이콘 */
+    .icon svg {
+      width: 26px;
+      height: 26px;
+      stroke: var(--rose);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+    }
+
+    /* ── 배지 ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(212, 145, 108, 0.08);
+      border: 1px solid rgba(212, 145, 108, 0.18);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--rose);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .badge::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--rose);
+      opacity: 0.8;
+    }
+
+    /* ── 타이틀 ── */
+    h1 {
+      font-size: 18px;
+      line-height: 1.3;
+      margin-bottom: 12px;
+      color: #fff;
+      letter-spacing: -0.03em;
+      font-weight: 800;
+    }
+
+    .fail-title {
+      font-size: 16px !important;
+      line-height: 1.28 !important;
+      font-weight: 700 !important;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+      color: #fff;
+      text-align: center;
+      max-width: 260px;
+      margin-left: auto;
+      margin-right: auto;
       word-break: keep-all;
     }
 
+    /* ── 설명 텍스트 ── */
+    p {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--sub);
+      margin-bottom: 28px;
+      word-break: keep-all;
+    }
+
+    /* ── 구분선 ── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+      margin-bottom: 24px;
+    }
+
+    /* ── 상태 정보 박스 ── */
+    .status-box {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(10, 16, 32, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 13px 16px;
+      margin-bottom: 22px;
+      text-align: left;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      min-width: 8px;
+      border-radius: 50%;
+      background: #e8685a;
+      box-shadow: 0 0 6px rgba(232, 104, 90, 0.6);
+    }
+
+    .status-text {
+      font-size: 13px;
+      color: var(--sub2);
+      line-height: 1.5;
+    }
+
+    .status-text strong {
+      color: #c8b9ad;
+      font-weight: 600;
+    }
+
+    /* ── 버튼 ── */
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 7px;
       width: 100%;
-      min-height: 50px;
-      padding: 0 20px;
+      min-height: 52px;
+      padding: 0 24px;
       border: 0;
       border-radius: 999px;
-      background: linear-gradient(135deg, var(--rose), var(--rose-strong));
+      background: linear-gradient(135deg, var(--rose-light) 0%, var(--rose) 40%, var(--rose-strong) 100%);
       color: #fff;
       font-size: 15px;
       font-weight: 700;
       cursor: pointer;
       text-decoration: none;
-      box-shadow: 0 6px 24px rgba(212, 145, 108, 0.25);
+      letter-spacing: -0.01em;
+      box-shadow:
+        0 8px 28px rgba(212, 145, 108, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
     }
 
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 12px 36px rgba(212, 145, 108, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+      filter: brightness(1.04);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      box-shadow:
+        0 5px 18px rgba(212, 145, 108, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: rgba(255,255,255,0.85);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
+    }
+
+    /* ── 힌트 텍스트 ── */
     .hint {
-      margin-top: 12px;
+      margin-top: 14px;
       font-size: 12px;
-      color: #7f8da1;
+      color: var(--sub2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
     }
 
+    .hint svg {
+      width: 12px;
+      height: 12px;
+      stroke: var(--sub2);
+      stroke-width: 2;
+      flex-shrink: 0;
+    }
+
+    /* ── 하단 브랜드 문구 ── */
+    .footer-brand {
+      margin-top: 24px;
+      width: 100%;
+      font-size: 12px;
+      color: #4d6070;
+      text-align: center;
+      letter-spacing: 0.01em;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ── 모바일 반응형 ── */
     @media (max-width: 480px) {
-      body {
-        padding: 18px 12px;
-      }
+      .viewport-shell { padding: 20px 14px; }
+
+      .site-header { margin-bottom: 22px; }
 
       .card {
-        padding: 24px 18px 20px;
-        border-radius: 16px;
+        padding: 32px 22px 28px;
+        border-radius: 18px;
       }
 
-      h1 {
-        font-size: 21px;
+      .fail-title {
+        font-size: 15px !important;
+        max-width: 240px;
       }
+
+      .icon-wrap { width: 60px; height: 60px; }
+      .icon { width: 60px; height: 60px; }
     }
   </style>
 </head>
 <body>
+  <div class="viewport-shell">
+    <div class="viewport-stack">
+
+  <!-- 상단 로고 -->
+  <header class="site-header">
+    <a class="logo" href="https://reconnectlab.co.kr/" target="_top">
+      <span class="logo-text">리커넥트<span>랩</span></span>
+    </a>
+  </header>
+
   <main class="page">
     <section class="card">
-      <div class="icon">!</div>
-      <h1>결제가 취소되었거나 실패했어요</h1>
-      <p>무료리포트는 다시 확인할 수 있어요. 아래 버튼을 눌러 이전 결과로 돌아가세요.</p>
-      <a id="returnBtn" class="btn" href="/" target="_top">무료리포트 다시 보기</a>
-      <div class="hint">결제는 완료되지 않았어요.</div>
+
+      <!-- 아이콘 -->
+      <div class="icon-wrap">
+        <div class="icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- 배지 -->
+      <div class="badge">결제 실패</div>
+
+      <!-- 타이틀 -->
+      <h1 class="fail-title">결제가 취소되었거나 실패했어요</h1>
+
+      <!-- 설명 -->
+      <p>무료 리포트는 그대로 유지돼요.<br>아래 버튼을 눌러 이전 결과로 돌아가세요.</p>
+
+      <!-- 구분선 -->
+      <div class="divider"></div>
+
+      <!-- 상태 박스 -->
+      <div class="status-box">
+        <div class="status-dot"></div>
+        <p class="status-text" style="margin:0;">
+          <strong>결제는 완료되지 않았어요.</strong><br>
+          청구된 금액이 없으니 안심하세요.
+        </p>
+      </div>
+
+      <!-- CTA 버튼 -->
+      <a id="returnBtn" class="btn" href="javascript:void(0)" target="_top">
+        무료리포트 다시 보기
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 12h14M13 6l6 6-6 6"/>
+        </svg>
+      </a>
+
+      <!-- 힌트 -->
+      <div class="hint">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        결제가 완료되지 않아 변경된 사항이 없어요
+      </div>
+
     </section>
   </main>
 
+  <!-- 하단 브랜드 -->
+  <div class="footer-brand">© 리커넥트랩 · reconnectlab.co.kr</div>
+
+    </div>
+  </div>
   <script>
-    const HOME_URL = "https://reconnectlab.co.kr/";
-    const FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
-    const FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
-    const PREMIUM_TOKEN_STORAGE_KEY = "rl_premium_report_token";
-    const PAYMENT_LAST_MODE_KEY = "rl_payment_last_mode";
-    const PAYMENT_LAST_CODE_KEY = "rl_payment_last_code";
-    const PAYMENT_LAST_MSG_KEY = "rl_payment_last_msg";
+    (function () {
+      const HOME_URL = "https://reconnectlab.co.kr/";
+      const FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
+      const FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
+      const PREMIUM_TOKEN_STORAGE_KEY = "rl_premium_report_token";
+      const PAYMENT_LAST_MODE_KEY = "rl_payment_last_mode";
+      const PAYMENT_LAST_CODE_KEY = "rl_payment_last_code";
+      const PAYMENT_LAST_MSG_KEY = "rl_payment_last_msg";
+      const RETURN_FROM_PAYMENT_FAIL_KEY = "rl_return_from_payment_fail";
 
-    const returnBtn = document.getElementById("returnBtn");
+      const returnBtn = document.getElementById("returnBtn");
 
-    function log(event, payload) {
-      console.debug("[RCL payment-fail]", event, payload || {});
-    }
+      function log(event, payload) {
+        console.debug("[RCL payment-fail]", event, payload || {});
+      }
 
-    log("payment_fail.page.version", {
-      version: "2026-03-22-payment-fail-v2",
-      href: window.location.href
-    });
+      log("payment_fail.page.version", {
+        version: "2026-03-22-payment-fail-return-flow-v1",
+        href: window.location.href
+      });
 
-    function getStored(key, storage) {
+      function getStored(key, storage) {
       try {
         return (storage || localStorage).getItem(key) || "";
       } catch (e) {
@@ -160,62 +520,13 @@
       }
     }
 
-    function removeStored(key, storage) {
+      function removeStored(key, storage) {
       try {
         (storage || localStorage).removeItem(key);
       } catch (e) {}
     }
 
-    function maskToken(token) {
-      if (!token) return "";
-      return token.length > 8 ? token.slice(0, 4) + "..." + token.slice(-4) : token;
-    }
-
-    function validateCanonicalFreeUrl(rawUrl) {
-      if (!rawUrl) {
-        return { ok: false, reason: "empty_url" };
-      }
-
-      try {
-        const parsed = new URL(rawUrl, window.location.origin);
-        const token = parsed.searchParams.get("token");
-        const pathname = (parsed.pathname || "").toLowerCase();
-        const hostname = (parsed.hostname || "").toLowerCase();
-
-        log("payment_fail.return_path.normalized", {
-          rawUrl: rawUrl,
-          hostname: hostname,
-          pathname: pathname,
-          token: maskToken(token || ""),
-          normalizedCandidate: token ? (parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token)) : ""
-        });
-
-        if (!token) return { ok: false, reason: "missing_token" };
-        if (pathname.includes("/pay/start")) return { ok: false, reason: "pay_start_path" };
-        if (pathname.includes("premium")) return { ok: false, reason: "premium_path" };
-        if (pathname.includes("payment-fail")) return { ok: false, reason: "payment_fail_path" };
-        if (hostname.includes("onrender.com")) return { ok: false, reason: "api_domain" };
-
-        return {
-          ok: true,
-          normalized: parsed.origin + parsed.pathname + "?token=" + encodeURIComponent(token)
-        };
-      } catch (e) {
-        return { ok: false, reason: "invalid_url" };
-      }
-    }
-
-    function buildReturnUrlWithFlag(url) {
-      try {
-        const parsed = new URL(url, window.location.origin);
-        parsed.searchParams.set("from_payment_fail", "1");
-        return parsed.toString();
-      } catch (e) {
-        return url;
-      }
-    }
-
-    function getQueryValue(key) {
+      function getQueryValue(key) {
       try {
         return new URLSearchParams(window.location.search).get(key) || "";
       } catch (e) {
@@ -223,113 +534,73 @@
       }
     }
 
-    function buildFreeUrlFromToken(token) {
+      function buildFreeUrlFromToken(token) {
       if (!token) return "";
       return HOME_URL.replace(/\/$/, "") + "/report?token=" + encodeURIComponent(token);
     }
 
-    function resolveReturnUrl() {
+      function validateCanonicalFreeUrl(rawUrl) {
+      if (!rawUrl || !rawUrl.trim()) {
+        return { ok: false, reason: "empty_url" };
+      }
+
+      try {
+        const decoded = decodeURIComponent(rawUrl.trim());
+        const parsed = new URL(decoded, HOME_URL);
+        const hostname = (parsed.hostname || "").toLowerCase();
+        const pathname = parsed.pathname || "";
+        const token = parsed.searchParams.get("token") || "";
+        const homeHostname = new URL(HOME_URL).hostname.toLowerCase();
+
+        if (!token) return { ok: false, reason: "missing_token" };
+        if (hostname !== homeHostname && parsed.origin !== window.location.origin) {
+          return { ok: false, reason: "external_domain" };
+        }
+        if (!pathname.includes("/report")) {
+          return { ok: false, reason: "invalid_path" };
+        }
+
+        return { ok: true, url: parsed.toString() };
+      } catch (e) {
+        return { ok: false, reason: "invalid_url" };
+      }
+    }
+
+      function resolveReturnUrl() {
       const queryFreeReturnUrl = getQueryValue("free_return_url");
       const queryFreeToken = getQueryValue("free_token");
-      const rawLocalUrl = getStored(FREE_RETURN_URL_STORAGE_KEY, localStorage);
-      const rawSessionUrl = getStored(FREE_RETURN_URL_STORAGE_KEY, sessionStorage);
-
       const rawLocalToken = getStored(FREE_REPORT_TOKEN_STORAGE_KEY, localStorage);
       const rawSessionToken = getStored(FREE_REPORT_TOKEN_STORAGE_KEY, sessionStorage);
-
       log("payment_fail.return_path.query_url_raw", { url: queryFreeReturnUrl || "" });
-      log("payment_fail.query.free_token", { token: maskToken(queryFreeToken) });
 
-      const queryUrlCandidate = validateCanonicalFreeUrl(queryFreeReturnUrl);
-      if (queryUrlCandidate.ok) {
-        log("payment_fail.return_path.query_url_selected", { url: queryUrlCandidate.normalized });
-        log("payment_fail.return_path.selected", { source: "query:free_return_url", url: queryUrlCandidate.normalized });
-        return queryUrlCandidate.normalized;
-      }
-      if (queryFreeReturnUrl) {
-        log("payment_fail.return_path.query_url_rejected", {
-          url: queryFreeReturnUrl,
-          reason: queryUrlCandidate.reason
+      const validatedQueryUrl = validateCanonicalFreeUrl(queryFreeReturnUrl);
+      if (validatedQueryUrl.ok) {
+        log("payment_fail.return_path.selected", {
+          source: "query:free_return_url",
+          url: validatedQueryUrl.url
         });
+        return validatedQueryUrl.url;
       }
 
       if (queryFreeToken) {
-        const queryTokenUrl = buildFreeUrlFromToken(queryFreeToken);
-        const queryTokenCandidate = validateCanonicalFreeUrl(queryTokenUrl);
-        if (queryTokenCandidate.ok) {
-          log("payment_fail.return_path.selected", { source: "query:free_token", url: queryTokenCandidate.normalized });
-          return queryTokenCandidate.normalized;
-        }
-        log("payment_fail.return_path.invalid", {
-          source: "query:free_token",
-          reason: queryTokenCandidate.reason,
-          attemptedUrl: queryTokenUrl
-        });
-      }
-
-      log("payment_fail.return_path.raw_url", {
-        localStorage: rawLocalUrl || "",
-        sessionStorage: rawSessionUrl || ""
-      });
-      log("payment_fail.return_path.raw_token", {
-        localStorage: maskToken(rawLocalToken),
-        sessionStorage: maskToken(rawSessionToken)
-      });
-
-      const localCandidate = validateCanonicalFreeUrl(rawLocalUrl);
-      if (localCandidate.ok) {
-        log("payment_fail.return_path.fallback_storage", { source: "localStorage:url" });
-        log("payment_fail.return_path.selected", { source: "localStorage:url", url: localCandidate.normalized });
-        return localCandidate.normalized;
-      }
-      if (rawLocalUrl) {
-        log("payment_fail.return_path.invalid", {
-          source: "localStorage:url",
-          reason: localCandidate.reason,
-          attemptedUrl: rawLocalUrl
-        });
-      }
-
-      const sessionCandidate = validateCanonicalFreeUrl(rawSessionUrl);
-      if (sessionCandidate.ok) {
-        log("payment_fail.return_path.fallback_storage", { source: "sessionStorage:url" });
-        log("payment_fail.return_path.selected", { source: "sessionStorage:url", url: sessionCandidate.normalized });
-        return sessionCandidate.normalized;
-      }
-      if (rawSessionUrl) {
-        log("payment_fail.return_path.invalid", {
-          source: "sessionStorage:url",
-          reason: sessionCandidate.reason,
-          attemptedUrl: rawSessionUrl
-        });
+        const selectedUrl = buildFreeUrlFromToken(queryFreeToken);
+        log("payment_fail.return_path.selected", { source: "query:free_token", url: selectedUrl });
+        return selectedUrl;
       }
 
       if (rawLocalToken || rawSessionToken) {
         const storageToken = rawLocalToken || rawSessionToken;
-        const storageTokenUrl = buildFreeUrlFromToken(storageToken);
-        const storageTokenCandidate = validateCanonicalFreeUrl(storageTokenUrl);
-        if (storageTokenCandidate.ok) {
-          log("payment_fail.return_path.fallback_storage", { source: "free_token" });
-          log("payment_fail.return_path.selected", { source: "free_token", url: storageTokenCandidate.normalized });
-          return storageTokenCandidate.normalized;
-        }
-        log("payment_fail.return_path.invalid", {
-          source: "free_token",
-          reason: storageTokenCandidate.reason,
-          attemptedUrl: storageTokenUrl
-        });
+        const selectedUrl = buildFreeUrlFromToken(storageToken);
+        log("payment_fail.return_path.selected", { source: "storage:free_token", url: selectedUrl });
+        return selectedUrl;
       }
 
-      log("payment_fail.return_path.fallback_home", {
-        reason: "no_valid_query_or_storage_free_url",
-        rawTokenLocal: maskToken(rawLocalToken),
-        rawTokenSession: maskToken(rawSessionToken)
-      });
+      log("payment_fail.return_path.fallback_home", { reason: "missing_free_token" });
       log("payment_fail.return_path.selected", { source: "home", url: HOME_URL });
       return HOME_URL;
     }
 
-    function cleanupPremiumState() {
+      function cleanupPremiumState() {
       [
         PREMIUM_TOKEN_STORAGE_KEY,
         "rl_premium_entry_token",
@@ -349,44 +620,45 @@
       removeStored(PAYMENT_LAST_MSG_KEY, localStorage);
     }
 
-    log("payment_fail.enter", {
-      href: window.location.href
-    });
-    log("payment_fail.reason", {
-      reason: getQueryValue("reason") || ""
-    });
-    log("payment_fail.context", {
-      is_top_window: window.self === window.top,
-      current_url: window.location.href,
-      referrer: document.referrer || ""
-    });
+      log("payment_fail.enter", {
+        href: window.location.href
+      });
+      log("payment_fail.reason", {
+        reason: getQueryValue("reason") || ""
+      });
+      log("payment_fail.context", {
+        is_top_window: window.self === window.top,
+        current_url: window.location.href,
+        referrer: document.referrer || ""
+      });
 
-    cleanupPremiumState();
+      cleanupPremiumState();
 
-    if (window.self !== window.top) {
-      try {
-        window.top.location.replace(window.location.href);
-        return;
-      } catch (e) {}
-    }
-
-    const returnUrl = resolveReturnUrl();
-    const ctaUrl = buildReturnUrlWithFlag(returnUrl);
-    returnBtn.href = ctaUrl;
-    log("payment_fail.return_cta.href", { url: ctaUrl });
-
-    returnBtn.addEventListener("click", function (event) {
-      event.preventDefault();
-      log("payment_fail.return_cta.click", { url: ctaUrl });
-      log("payment_fail.return_cta.target_url", { url: ctaUrl });
-      try {
-        log("payment_fail.return_cta.navigate_top", { url: ctaUrl });
-        window.top.location.href = ctaUrl;
-      } catch (e) {
-        log("payment_fail.return_cta.navigate_self", { url: ctaUrl });
-        window.location.href = ctaUrl;
+      if (window.self !== window.top) {
+        try {
+          window.top.location.replace(window.location.href);
+          return;
+        } catch (e) {}
       }
-    });
+
+      const finalUrl = resolveReturnUrl();
+      returnBtn.href = finalUrl;
+      log("payment_fail.return_cta.href", { url: finalUrl });
+
+      returnBtn.addEventListener("click", function (event) {
+        event.preventDefault();
+        try {
+          sessionStorage.setItem(RETURN_FROM_PAYMENT_FAIL_KEY, "1");
+        } catch (e) {}
+        log("payment_fail.return_cta.click", { url: finalUrl });
+        log("payment_fail.return_cta.target_url", { url: finalUrl });
+        try {
+          window.top.location.href = finalUrl;
+        } catch (e) {
+          window.location.href = finalUrl;
+        }
+      });
+    })();
   </script>
 </body>
 </html>

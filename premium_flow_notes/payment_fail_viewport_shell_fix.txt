@@ -1,0 +1,54 @@
+1. 수정한 파일 목록
+- `imweb/imweb payment-fail.html`
+
+2. 수정한 함수 목록
+- 없음
+- 이번 라운드는 JS가 아니라 레이아웃 구조/CSS만 수정했습니다.
+
+3. 제거한 레이아웃 구조 목록
+- 기존 `.layout-root` 기반 일반 문서 흐름 중앙정렬 구조
+- body에 남아 있던 내부 padding 중심 레이아웃 의존
+- `.site-header`, `.page`, `.footer-brand` 각각의 `max-width: 520px` 분산 책임
+
+4. 새 viewport-shell / viewport-stack 구조 설명
+- `body`
+  - `div.viewport-shell`
+    - `div.viewport-stack`
+      - `header.site-header`
+      - `main.page`
+      - `div.footer-brand`
+- `viewport-shell`은 브라우저 viewport 기준 고정 레이어입니다.
+  - `position: fixed`
+  - `inset: 0`
+  - `width: 100vw`
+  - `min-height: 100vh`
+  - `display: grid`
+  - `place-items: center`
+  - `overflow-y: auto`
+- `viewport-stack`은 실제 콘텐츠 폭 책임을 가집니다.
+  - `width: min(520px, calc(100vw - 32px))`
+  - `display: flex`
+  - `flex-direction: column`
+  - `align-items: stretch`
+  - `margin: 0 auto`
+
+5. 왜 기존 width:100% flex 구조가 실패했다고 판단했는지
+- 기존 구조는 `.layout-root { width:100%; min-height:100vh; display:flex; align-items:center; justify-content:center; }`였지만, 실제 아임웹에서는 이 `100%`가 viewport가 아니라 외부 위젯/섹션 컨테이너 폭 기준으로 해석될 수 있었습니다.
+- 따라서 내부는 flex 중앙정렬이어도, 기준 박스 자체가 좌측 정렬된 부모 폭에 종속되어 카드가 왼쪽 column처럼 보일 수 있었습니다.
+- 이번 수정은 아예 `position: fixed; inset:0; width:100vw; min-height:100vh;`로 viewport 기준을 강제해 외부 wrapper 영향보다 브라우저 뷰포트를 우선하도록 바꿨습니다.
+
+6. 테스트 시나리오별 결과
+- 케이스 1: 아임웹 실제 payment-fail 페이지
+  - 카드/로고/푸터가 viewport 중앙 기준으로 정렬되도록 구조 수정
+- 케이스 2: PC 넓은 화면
+  - `viewport-stack`이 520px 기준 중앙 배치
+- 케이스 3: 모바일 폭
+  - `width: min(520px, calc(100vw - 32px))` 및 모바일 패딩으로 화면 넘침 방지
+- 케이스 4: 세로 높이 낮은 환경
+  - `viewport-shell`에 `overflow-y:auto`를 둬 카드/버튼 잘림 대신 자연스러운 스크롤 허용
+- 케이스 5: 버튼 동작
+  - JS 복귀 로직은 수정하지 않아 기존 동작 경로 유지
+
+7. 남은 리스크 1~2개
+- 아임웹 바깥 섹션이 `transform`, `zoom`, 특수 iframe 컨텍스트를 걸고 있으면 viewport 기준 fixed 해석이 환경마다 다를 수 있습니다.
+- 동일한 외부 래퍼 영향이 free-report에도 있다면, 같은 `viewport-shell` 패턴이 별도로 필요할 수 있습니다.

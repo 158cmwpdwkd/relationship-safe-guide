@@ -1,0 +1,40 @@
+1. 수정한 파일 목록
+- `imweb/imweb payment-fail.html`
+
+2. 수정한 함수 목록
+- 없음
+- 이번 수정은 CSS 충돌 정리와 h1 적용값 일원화만 수행했습니다.
+
+3. 제거한 CSS 충돌 목록
+- `.viewport-shell` 내부의 중복 `position` 선언
+  - 유지: `position: fixed`
+  - 제거: `position: relative`
+- 모바일 미디어쿼리 안의 `h1 { font-size: 20px; }` 덮어쓰기 선언 제거
+
+4. viewport-shell 최종 핵심 속성
+- `position: fixed`
+- `inset: 0`
+- `width: 100vw`
+- `min-height: 100vh`
+- `display: grid`
+- `place-items: center`
+- `padding: 32px 16px`
+- `overflow-y: auto`
+- `z-index: 1`
+
+5. h1 최종 적용값
+- `font-size: 18px`
+- `line-height: 1.3`
+- `margin-bottom: 12px`
+- `font-weight: 800`
+- `letter-spacing: -0.03em`
+
+6. 모바일 미디어쿼리 정리 내용
+- 모바일에서 제목을 다시 키우던 `h1 { font-size: 20px; }` 선언 제거
+- 이제 PC/모바일 모두 기본 h1 규칙 한 군데만 적용됩니다.
+
+7. 테스트 결과
+- PC: 제목 크기가 이전보다 확실히 줄어들도록 기본값을 18px로 고정
+- 모바일: 미디어쿼리에서 더 크게 덮어쓰지 않도록 정리
+- 중앙정렬: `viewport-shell`이 다시 실제 fixed 레이어로 동작하도록 충돌 제거
+- 버튼 동작: JS는 수정하지 않아 기존 무료리포트 다시보기 흐름 유지

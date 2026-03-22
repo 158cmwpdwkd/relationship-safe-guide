@@ -1,0 +1,40 @@
+1. 무료리포트가 안 뜨던 직접 원인
+- `from_payment_fail=1` 복귀 시 cleanup은 돌았지만, free report 렌더 시작 경로가 명시적으로 재진입 구조가 아니어서 첫 진입에서 iframe load 완료 흐름을 놓칠 수 있었습니다.
+
+2. 빠져 있던 init/render 경로
+- 기존 구조는 사실상 top-level 1회성 boot 블록에 `frameEl.src` 할당과 `load` 바인딩이 섞여 있었습니다.
+- 복귀 직후에는 `from_payment_fail` cleanup, query 정리, 렌더 시작이 분리돼 있지 않아 첫 렌더가 불안정했습니다.
+
+3. 이번 수정 내용
+- `bootFreeReport()`로 boot 경로를 묶었습니다.
+- `startFreeRender(token, { fromPaymentFail })`를 추가해 복귀 직후에도 명시적으로 render init을 다시 타게 했습니다.
+- `from_payment_fail=1`이면
+  - `free.from_payment_fail.detected`
+  - `free.from_payment_fail.reinit_start`
+  - cleanup
+  - iframe src 재설정
+  - query cleanup
+  - load 완료 후 `free.from_payment_fail.reinit_done`
+  순서로 흐르도록 정리했습니다.
+
+4. 중복 렌더 방지 장치
+- `freeRenderInflight`
+- `freeRenderCompleted`
+- `frameLoadHandlerBound`
+- `frameLoadFallbackTimer`
+- 이미 inflight 상태면 `free.render.blocked` 로그를 남기고 중복 실행을 막습니다.
+
+5. 수정한 파일 목록
+- `imweb/imweb free-report.html`
+
+6. 테스트 시나리오
+- `payment-fail`에서 `무료리포트 다시 보기` 클릭
+- 첫 진입 URL이 `/report?token=...&from_payment_fail=1` 인지 확인
+- 새로고침 없이 free report iframe이 바로 로드되는지 확인
+- 브라우저 로그에서 아래 순서 확인
+  - `free.from_payment_fail.detected`
+  - `free.from_payment_fail.reinit_start`
+  - `free.history.clean_query`
+  - `free.render.done`
+  - `free.from_payment_fail.reinit_done`
+- 주소창 query에서 `from_payment_fail=1` 이 제거되는지 확인

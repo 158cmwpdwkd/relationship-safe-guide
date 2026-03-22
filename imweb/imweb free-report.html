@@ -521,6 +521,10 @@
     const PAYMENT_LAST_MODE_KEY = "rl_payment_last_mode";
     const PAYMENT_LAST_CODE_KEY = "rl_payment_last_code";
     const PAYMENT_LAST_MSG_KEY = "rl_payment_last_msg";
+    const RETURN_FROM_PAYMENT_FAIL_KEY = "rl_return_from_payment_fail";
+    const FREE_REPORT_RELOAD_DONE_KEY = "rl_free_report_reload_done";
+    const RETURN_FROM_PAYMENT_FAIL_KEY = "rl_return_from_payment_fail";
+    const FREE_REPORT_RELOAD_DONE_KEY = "rl_free_report_reload_done";
 
     const loadingEl   = document.getElementById("rcl-loading");
     const errorEl     = document.getElementById("rcl-error");
@@ -528,14 +532,103 @@
     const frameEl     = document.getElementById("rcl-report-frame");
     const extrasEl    = document.getElementById("rcl-extras");
 
+    let activeToken = "";
+    let freeRenderInflight = false;
+    let freeRenderCompleted = false;
+    let frameLoadHandlerBound = false;
+    let frameLoadFallbackTimer = null;
+    let paymentFailReinitPending = false;
+
     function debugLog(event, payload) {
       console.debug("[RCL free wrapper]", event, payload || {});
     }
 
     debugLog("free.page.version", {
-      version: "2026-03-22-free-render-only-v2",
+      version: "2026-03-22-free-boot-simplified-v1",
       href: window.location.href
     });
+
+    function handleSingleReloadAfterPaymentFail() {
+      let hasReturnFlag = false;
+      let reloadDone = false;
+      let cameFromPaymentFail = false;
+
+      try {
+        hasReturnFlag = sessionStorage.getItem(RETURN_FROM_PAYMENT_FAIL_KEY) === "1";
+        reloadDone = sessionStorage.getItem(FREE_REPORT_RELOAD_DONE_KEY) === "1";
+      } catch (e) {}
+
+      try {
+        cameFromPaymentFail = (document.referrer || "").indexOf("payment-fail") >= 0;
+      } catch (e) {}
+
+      if (!hasReturnFlag && !cameFromPaymentFail) {
+        return false;
+      }
+
+      debugLog("free.return_from_payment_fail.flag_detected", {
+        hasReturnFlag: hasReturnFlag,
+        cameFromPaymentFail: cameFromPaymentFail,
+        reloadDone: reloadDone
+      });
+
+      if (reloadDone) {
+        try {
+          sessionStorage.removeItem(RETURN_FROM_PAYMENT_FAIL_KEY);
+          sessionStorage.removeItem(FREE_REPORT_RELOAD_DONE_KEY);
+        } catch (e) {}
+        return false;
+      }
+
+      try {
+        sessionStorage.setItem(FREE_REPORT_RELOAD_DONE_KEY, "1");
+      } catch (e) {}
+
+      debugLog("free.forced_reload_once", { href: window.location.href });
+      window.location.replace(window.location.href);
+      return true;
+    }
+
+    function shouldForceReloadAfterPaymentFail() {
+      let hasReturnFlag = false;
+      let reloadDone = false;
+      let referrerLooksLikePaymentFail = false;
+
+      try {
+        hasReturnFlag = sessionStorage.getItem(RETURN_FROM_PAYMENT_FAIL_KEY) === "1";
+        reloadDone = sessionStorage.getItem(FREE_REPORT_RELOAD_DONE_KEY) === "1";
+      } catch (e) {}
+
+      try {
+        referrerLooksLikePaymentFail = (document.referrer || "").indexOf("payment-fail") >= 0;
+      } catch (e) {}
+
+      if (!(hasReturnFlag || referrerLooksLikePaymentFail)) {
+        return false;
+      }
+
+      debugLog("free.return_from_payment_fail.flag_detected", {
+        hasReturnFlag: hasReturnFlag,
+        referrerLooksLikePaymentFail: referrerLooksLikePaymentFail,
+        reloadDone: reloadDone
+      });
+
+      if (reloadDone) {
+        try {
+          sessionStorage.removeItem(RETURN_FROM_PAYMENT_FAIL_KEY);
+          sessionStorage.removeItem(FREE_REPORT_RELOAD_DONE_KEY);
+        } catch (e) {}
+        return false;
+      }
+
+      try {
+        sessionStorage.setItem(FREE_REPORT_RELOAD_DONE_KEY, "1");
+      } catch (e) {}
+
+      debugLog("free.forced_reload_once", { href: window.location.href });
+      window.location.replace(window.location.href);
+      return true;
+    }
 
     function hide(el) {
       if (!el) return;
@@ -556,12 +649,25 @@
     }
 
     function showReport() {
+      if (freeRenderCompleted) {
+        return;
+      }
+
+      freeRenderInflight = false;
+      freeRenderCompleted = true;
       hide(loadingEl);
       hide(errorEl);
       show(frameWrapEl, "block");
       show(extrasEl, "block");
-      debugLog("free.render.only", { token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "" });
-      debugLog("free.render.done", { token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "" });
+      debugLog("free.render.only", { token: activeToken ? (activeToken.slice(0, 4) + "..." + activeToken.slice(-4)) : "" });
+      debugLog("free.render.done", { token: activeToken ? (activeToken.slice(0, 4) + "..." + activeToken.slice(-4)) : "" });
+      if (paymentFailReinitPending) {
+        debugLog("free.from_payment_fail.reinit_done", {
+          token: activeToken ? (activeToken.slice(0, 4) + "..." + activeToken.slice(-4)) : ""
+        });
+        removeFromPaymentFailFlag();
+        paymentFailReinitPending = false;
+      }
 
       setTimeout(() => {
         document.querySelectorAll(".fade-up").forEach(el => el.classList.add("in"));
@@ -591,6 +697,7 @@
         if (parsed.searchParams.get("from_payment_fail") !== "1") return;
         parsed.searchParams.delete("from_payment_fail");
         window.history.replaceState({}, "", parsed.toString());
+        debugLog("free.history.clean_query.done", { href: parsed.toString() });
       } catch (e) {}
     }
 
@@ -781,53 +888,119 @@
       return getQueryToken() || getPathToken() || getStoredToken() || "";
     }
 
-    debugLog("free.boot.start", { href: window.location.href });
-    const token = getReportToken();
-    debugLog("free.token.detected", {
-      token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : ""
-    });
-    debugLog("free.enter", {
-      token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "",
-      href: window.location.href
-    });
-    const fromPaymentFail = hasFromPaymentFailFlag();
-    if (fromPaymentFail) {
-      debugLog("free.from_payment_fail.detected", { href: window.location.href });
-    }
-    cleanupPremiumState();
-    debugLog("free.cleanup.done", {});
+    function bindFrameLoadOnce() {
+      if (frameLoadHandlerBound) return;
+      frameLoadHandlerBound = true;
 
-    if (!token) {
-      showError();
-    } else {
+      frameEl.addEventListener("load", () => {
+        if (frameLoadFallbackTimer) {
+          clearTimeout(frameLoadFallbackTimer);
+          frameLoadFallbackTimer = null;
+        }
+        frameEl.classList.add("loaded");
+        showReport();
+      });
+    }
+
+    function startFreeRender(renderToken, options) {
+      const opts = options || {};
+      const fromPaymentFail = !!opts.fromPaymentFail;
+
+      if (!renderToken) {
+        showError();
+        return;
+      }
+
+      if (freeRenderInflight) {
+        debugLog("free.render.blocked", {
+          reason: "render_inflight",
+          token: renderToken ? (renderToken.slice(0, 4) + "..." + renderToken.slice(-4)) : ""
+        });
+        return;
+      }
+
+      bindFrameLoadOnce();
+
+      activeToken = renderToken;
+      freeRenderInflight = true;
+      freeRenderCompleted = false;
+      paymentFailReinitPending = fromPaymentFail;
+
+      if (fromPaymentFail) {
+        debugLog("free.from_payment_fail.reinit_start", {
+          token: renderToken ? (renderToken.slice(0, 4) + "..." + renderToken.slice(-4)) : ""
+        });
+      }
+
+      debugLog("free.render.start", {
+        token: renderToken ? (renderToken.slice(0, 4) + "..." + renderToken.slice(-4)) : ""
+      });
+
+      if (fromPaymentFail) {
+        removePaymentFailArtifactsAggressive();
+      }
+      removePaymentFailArtifacts();
+
+      frameEl.classList.remove("loaded");
+      frameEl.src = API_BASE + "/r/" + encodeURIComponent(renderToken) + "?v=" + Date.now();
+
+      if (frameLoadFallbackTimer) {
+        clearTimeout(frameLoadFallbackTimer);
+      }
+
+      frameLoadFallbackTimer = setTimeout(() => {
+        frameLoadFallbackTimer = null;
+        if (!freeRenderCompleted) {
+          frameEl.classList.add("loaded");
+          showReport();
+        }
+      }, 5000);
+    }
+
+    function bootFreeReport() {
+      debugLog("free.boot.start", { href: window.location.href });
+      const token = getReportToken();
+      const fromPaymentFail = hasFromPaymentFailFlag();
+
+      debugLog("free.token.detected", {
+        token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : ""
+      });
+      debugLog("free.enter", {
+        token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "",
+        href: window.location.href
+      });
+
+      if (fromPaymentFail) {
+        debugLog("free.from_payment_fail.detected", { href: window.location.href });
+      }
+
+      cleanupPremiumState();
+      debugLog("free.cleanup.done", {});
+
+      if (!token) {
+        showError();
+        return;
+      }
+
       const canonicalFreeReturnUrl = buildCanonicalFreeReturnUrl(window.location.href, token);
       setStoredToken(token);
       saveCanonicalFreeReturnUrl(canonicalFreeReturnUrl);
       debugLog("free.return.enter", {
         returnUrl: canonicalFreeReturnUrl
       });
-      debugLog("free.render.start", {
-        token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : ""
-      });
 
-      frameEl.src = API_BASE + "/r/" + encodeURIComponent(token) + "?v=" + Date.now();
       if (fromPaymentFail) {
         removePaymentFailArtifactsAggressive();
-        removeFromPaymentFailFlag();
       }
       removePaymentFailArtifacts();
 
-      frameEl.addEventListener("load", () => {
-        frameEl.classList.add("loaded");
-        showReport();
-      });
+      startFreeRender(token, { fromPaymentFail: fromPaymentFail });
+    }
 
-      setTimeout(() => {
-        if (loadingEl.style.display !== "none") {
-          frameEl.classList.add("loaded");
-          showReport();
-        }
-      }, 5000);
+    if (!shouldForceReloadAfterPaymentFail()) {
+    if (!handleSingleReloadAfterPaymentFail()) {
+      bootFreeReport();
+    }
     }
 
     let rclLastHeight = 0;

@@ -1,0 +1,33 @@
+1. 수정한 함수 목록
+- `appendFromPaymentFail(url)`
+- `buildFreeUrlFromToken(token)`
+- `validateCanonicalFreeUrl(rawUrl)`
+- `resolveReturnUrl()`
+
+2. 최종 return URL 우선순위
+- 1순위: query `free_return_url` 가 유효하면 그대로 사용
+- 2순위: query `free_token` 으로 canonical free report URL 생성
+- 3순위: localStorage / sessionStorage 의 free report token 으로 동일 URL 생성
+- 4순위: `HOME_URL`
+
+3. 제거/축소한 분기 로직
+- `free_return_url` 를 로그만 찍고 무시하던 흐름 제거
+- 불필요한 raw token/source 상세 로그 축소
+- `window.top.location.href` / `window.location.href` 혼용 제거
+- `free_return_url` 가 유효하면 token 재조립 분기로 내려가지 않게 단순화
+
+4. 버튼 href / click target 일치 여부
+- `returnBtn.href` 는 `resolveReturnUrl()` 가 선택한 `finalUrl` 하나만 사용
+- 클릭 이벤트도 같은 `finalUrl` 에 대해서만 `replace()` 이동 수행
+- `from_payment_fail=1` 은 최종 복귀 URL에 유지
+
+5. 테스트 시나리오별 결과
+- query `free_return_url` 존재: `validateCanonicalFreeUrl()` 통과 시 즉시 1순위 selected URL 채택
+- query `free_token`만 존재: `/report?token=...&from_payment_fail=1` 생성
+- storage token만 존재: storage token 기반 canonical URL 생성
+- 아무 값도 없음: `HOME_URL` fallback
+- top/self window: 우선 `window.top.location.replace(finalUrl)`, 실패 시 `window.location.replace(finalUrl)`
+
+6. 남은 리스크
+- 아임웹 페이지 레이아웃 문제는 이번 수정 범위 밖입니다.
+- free-report 첫 렌더/부팅 안정화는 `free-report.html` 쪽 단일 boot 구조 이슈로 별도 확인이 필요합니다.

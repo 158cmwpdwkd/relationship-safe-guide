@@ -1,0 +1,32 @@
+1. 기존 문제 (JS 실행 의존 구조)
+- 버튼 기본 href 가 `/` 였고, JS 가 나중에 실제 복귀 URL 로 덮어쓰는 구조였다.
+- 따라서 JS 가 실패하거나 늦게 실행되면 `/` 이 그대로 사용될 수 있었다.
+
+2. href 초기값 문제
+- `<a id="returnBtn" href="/">` 기본값이 홈 fallback 을 강제하고 있었다.
+- 이번 수정으로 기본 href 는 빈 값으로 변경했다.
+
+3. free_token 기반 강제 URL 생성 방식
+- query `free_token` 우선
+- 없으면 storage `free_token`
+- 있으면 무조건:
+  - `https://reconnectlab.co.kr/report?token={free_token}&from_payment_fail=1`
+
+4. 최종 버튼 동작 구조
+- 페이지 로드 직후 `returnBtn.href` 에 canonical free URL 즉시 세팅
+- 로그:
+  - payment_fail.return_btn.initial_href
+  - payment_fail.return_btn.final_href
+  - payment_fail.return_cta.href
+- 클릭 시 보조 처리:
+  - `window.top.location.href`
+  - 실패 시 `window.location.href`
+
+5. 수정한 파일 목록
+- imweb/imweb payment-fail.html
+
+6. 테스트 시나리오
+- payment-fail 진입
+- 개발자도구에서 `returnBtn.href` 확인
+- 클릭 전부터 `/report?token=...&from_payment_fail=1` 인지 확인
+- 클릭 시 정상 이동 확인

@@ -1,0 +1,31 @@
+1. 왜 기존 재초기화 구조가 문제였는지
+- free-report가 `ensureFreeReportBoot()` 즉시 실행, `pageshow`, delayed reinit timer까지 여러 부팅 경로를 동시에 갖게 되면서 상태 플래그와 충돌했습니다.
+- 그 결과 free 기본 진입에서도 렌더 경로가 흔들리고, 복귀/직접 진입 모두 불안정해졌습니다.
+
+2. 제거한 boot/reinit 경로
+- `ensureFreeReportBoot()` 제거
+- `pageshow` 재초기화 로직 제거
+- delayed reinit timer 제거
+- `freeBootStarted`, `delayedReinitTimer`, `delayedReinitAttempted`, `shouldReinitFreeRender()` 제거
+- `free.pageshow.*`, `free.delayed_reinit_*`, `free.history.clean_query.defer` 로그 제거
+
+3. 단순화한 최종 부팅 흐름
+- `bootFreeReport()` 1회 호출
+- 내부 순서:
+  - `free.boot.start`
+  - token 파싱
+  - `free.enter`
+  - `cleanupPremiumState()`
+  - `from_payment_fail=1` 이면 최소 범위 fail artifact cleanup
+  - `startFreeRender(token, { fromPaymentFail })`
+  - iframe load 또는 fallback 완료 후 `free.render.done`
+  - `from_payment_fail=1` 이었으면 그 시점에 `free.history.clean_query.done`
+
+4. 수정한 파일 목록
+- `imweb/imweb free-report.html`
+
+5. 테스트 시나리오
+- `/report?token=...` 직접 진입 후 free report 정상 렌더 확인
+- `payment-fail -> 무료리포트 다시 보기` 클릭
+- 새로고침 없이 free-report가 바로 뜨는지 확인
+- 주소창에서 `from_payment_fail=1` 이 렌더 후 제거되는지 확인

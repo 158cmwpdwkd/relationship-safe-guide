@@ -1,0 +1,38 @@
+1. 왜 새로고침해야만 리포트가 떴는지
+- free-report 초기화가 사실상 파일 로드 시점 1회성 `bootFreeReport()` 호출에 묶여 있었습니다.
+- payment-fail -> `/report?token=...` 복귀가 완전한 새 문서 로드로 처리되지 않으면 첫 진입에서 init/render가 다시 시작되지 않아 빈 화면처럼 보일 수 있었습니다.
+
+2. 기존 1회성 init 구조 문제
+- `bootFreeReport()`가 스크립트 마지막에서 한 번만 실행됐습니다.
+- `from_payment_fail=1` 복귀에서도 같은 init 경로를 다시 타는 보장이 없었습니다.
+- query 정리도 `iframe src` 세팅 직후 바로 수행돼 복귀 전용 분기를 너무 빨리 잃을 수 있었습니다.
+
+3. pageshow / delayed reinit 로직 추가 내용
+- `runFreeReportBoot()` / `ensureFreeReportBoot()`로 실제 boot 경로를 재호출 가능하게 분리했습니다.
+- `window.addEventListener("pageshow", ...)`를 추가했습니다.
+- 아래 조건이면 reinit를 다시 탑니다.
+  - `from_payment_fail=1`
+  - token 존재
+  - `freeRenderCompleted === false`
+  - `frameEl.src` 비어 있음 또는 frame이 아직 표시되지 않음
+- 추가로 600ms 지연 체크 1회를 넣어 첫 진입 직후 아직 렌더가 안 보이면 한 번 더 init를 시도하게 했습니다.
+
+4. from_payment_fail 쿼리 제거 시점 조정
+- 기존: `iframe src` 설정 직후 바로 `history.replaceState`
+- 변경: `free.history.clean_query.defer` 로그만 먼저 남기고, 실제 제거는 `showReport()` 완료 시점에 `free.history.clean_query.done`으로 수행하도록 변경
+
+5. 수정한 파일 목록
+- `imweb/imweb free-report.html`
+
+6. 테스트 시나리오
+- `payment-fail`에서 `무료리포트 다시 보기` 클릭
+- 첫 진입 URL이 `/report?token=...&from_payment_fail=1`로 들어오는지 확인
+- 새로고침 없이 free report가 바로 뜨는지 확인
+- 브라우저 로그에서 아래 순서 확인
+  - `free.pageshow`
+  - `free.pageshow.reinit_start` 또는 `free.delayed_reinit_start`
+  - `free.from_payment_fail.reinit_start`
+  - `free.render.done`
+  - `free.from_payment_fail.reinit_done`
+  - `free.history.clean_query.done`
+- 이후 주소창에서 `from_payment_fail=1`이 제거된 clean URL인지 확인
