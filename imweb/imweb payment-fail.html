@@ -205,6 +205,16 @@
       }
     }
 
+    function buildReturnUrlWithFlag(url) {
+      try {
+        const parsed = new URL(url, window.location.origin);
+        parsed.searchParams.set("from_payment_fail", "1");
+        return parsed.toString();
+      } catch (e) {
+        return url;
+      }
+    }
+
     function getQueryValue(key) {
       try {
         return new URLSearchParams(window.location.search).get(key) || "";
@@ -227,19 +237,19 @@
       const rawLocalToken = getStored(FREE_REPORT_TOKEN_STORAGE_KEY, localStorage);
       const rawSessionToken = getStored(FREE_REPORT_TOKEN_STORAGE_KEY, sessionStorage);
 
-      log("payment_fail.query.free_return_url", { url: queryFreeReturnUrl || "" });
+      log("payment_fail.return_path.query_url_raw", { url: queryFreeReturnUrl || "" });
       log("payment_fail.query.free_token", { token: maskToken(queryFreeToken) });
 
       const queryUrlCandidate = validateCanonicalFreeUrl(queryFreeReturnUrl);
       if (queryUrlCandidate.ok) {
+        log("payment_fail.return_path.query_url_selected", { url: queryUrlCandidate.normalized });
         log("payment_fail.return_path.selected", { source: "query:free_return_url", url: queryUrlCandidate.normalized });
         return queryUrlCandidate.normalized;
       }
       if (queryFreeReturnUrl) {
-        log("payment_fail.return_path.invalid", {
-          source: "query:free_return_url",
-          reason: queryUrlCandidate.reason,
-          attemptedUrl: queryFreeReturnUrl
+        log("payment_fail.return_path.query_url_rejected", {
+          url: queryFreeReturnUrl,
+          reason: queryUrlCandidate.reason
         });
       }
 
@@ -361,19 +371,20 @@
     }
 
     const returnUrl = resolveReturnUrl();
-    returnBtn.href = returnUrl;
-    log("payment_fail.return_cta.href", { url: returnUrl });
+    const ctaUrl = buildReturnUrlWithFlag(returnUrl);
+    returnBtn.href = ctaUrl;
+    log("payment_fail.return_cta.href", { url: ctaUrl });
 
     returnBtn.addEventListener("click", function (event) {
       event.preventDefault();
-      log("payment_fail.return_cta.click", { url: returnUrl });
-      log("payment_fail.return_cta.target_url", { url: returnUrl });
+      log("payment_fail.return_cta.click", { url: ctaUrl });
+      log("payment_fail.return_cta.target_url", { url: ctaUrl });
       try {
-        log("payment_fail.return_cta.navigate_top", { url: returnUrl });
-        window.top.location.href = returnUrl;
+        log("payment_fail.return_cta.navigate_top", { url: ctaUrl });
+        window.top.location.href = ctaUrl;
       } catch (e) {
-        log("payment_fail.return_cta.navigate_self", { url: returnUrl });
-        window.location.href = returnUrl;
+        log("payment_fail.return_cta.navigate_self", { url: ctaUrl });
+        window.location.href = ctaUrl;
       }
     });
   </script>

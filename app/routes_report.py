@@ -15,6 +15,10 @@ router = APIRouter()
 PAYMENT_FAIL_URL = "https://reconnectlab.co.kr/payment-fail"
 
 
+def _is_free_report_token(token: str) -> bool:
+    return (token or "").startswith("t_free_")
+
+
 def load_report_and_session_by_token(token: str, db: Session):
     rep = db.query(Report).filter(Report.report_token == token).first()
     if not rep:
@@ -27,7 +31,9 @@ def load_report_and_session_by_token(token: str, db: Session):
     return rep, sess
 
 
-def _is_premium_flow_token(*, report: Report, db: Session) -> bool:
+def _is_premium_flow_token(*, token: str, report: Report, db: Session) -> bool:
+    if _is_free_report_token(token):
+        return False
     has_order = db.query(Order).filter(Order.sid == report.sid).first() is not None
     has_paid_survey = db.query(PaidSurvey).filter(PaidSurvey.sid == report.sid).first() is not None
     has_premium_content = bool((report.html or "").strip() or (report.markdown or "").strip())
@@ -37,6 +43,20 @@ def _is_premium_flow_token(*, report: Report, db: Session) -> bool:
 def resolve_report_html(token: str) -> HTMLResponse:
     db = SessionLocal()
     try:
+        report, session = load_report_and_session_by_token(token, db)
+        token_type = "free" if _is_free_report_token(token) else "premium"
+        print(f"report.route.token_type token={token} token_type={token_type}")
+
+        if _is_free_report_token(token):
+            print(f"report.route.free_token_bypass_premium token={token}")
+            return HTMLResponse(
+                make_report_html(
+                    risk_level=session.risk_level,
+                    impulse=session.impulse_index,
+                    fear_type=session.fear_type,
+                )
+            )
+
         state = resolve_premium_state(report_token=token, db=db)
         if state.state == "INVALID_REPORT_TOKEN":
             return HTMLResponse(
@@ -50,8 +70,8 @@ def resolve_report_html(token: str) -> HTMLResponse:
                 status_code=404,
             )
 
-        report, session = load_report_and_session_by_token(token, db)
-        is_premium_flow = _is_premium_flow_token(report=report, db=db)
+        is_premium_flow = _is_premium_flow_token(token=token, report=report, db=db)
+        print(f"report.route.premium_token_flow token={token} is_premium_flow={is_premium_flow}")
 
         if state.state == "READY" and (report.html or "").strip():
             return HTMLResponse(report.html)
@@ -64,6 +84,7 @@ def resolve_report_html(token: str) -> HTMLResponse:
                 )
 
             if state.state == "NOT_PAID":
+                print(f"report.route.redirect_payment_fail token={token}")
                 return RedirectResponse(
                     url=f"{PAYMENT_FAIL_URL}?reason=not_paid&report_token={token}",
                     status_code=302,

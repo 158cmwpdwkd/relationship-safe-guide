@@ -577,6 +577,23 @@
       }
     }
 
+    function hasFromPaymentFailFlag() {
+      try {
+        return new URLSearchParams(window.location.search).get("from_payment_fail") === "1";
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function removeFromPaymentFailFlag() {
+      try {
+        const parsed = new URL(window.location.href, window.location.origin);
+        if (parsed.searchParams.get("from_payment_fail") !== "1") return;
+        parsed.searchParams.delete("from_payment_fail");
+        window.history.replaceState({}, "", parsed.toString());
+      } catch (e) {}
+    }
+
     function getPathToken() {
       try {
         const path = window.location.pathname || "";
@@ -728,6 +745,38 @@
       }
     }
 
+    function removePaymentFailArtifactsAggressive() {
+      debugLog("free.cleanup.fail_artifacts.start", {});
+      const removed = [];
+
+      const selectors = [
+        "#returnBtn",
+        ".page .card",
+        ".card .btn",
+        ".page",
+      ];
+
+      selectors.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((node) => {
+          const text = (node.textContent || "").trim();
+          if (!text) return;
+          if (
+            text.indexOf("결제가 취소되었거나 실패했어요") >= 0 ||
+            text.indexOf("무료리포트 다시 보기") >= 0 ||
+            text.indexOf("결제는 완료되지 않았어요") >= 0
+          ) {
+            if (node.closest("#rcl-main") || node.closest("#rcl-nav") || node.closest("#rcl-footer")) return;
+            if (node.parentNode) {
+              removed.push(selector);
+              node.parentNode.removeChild(node);
+            }
+          }
+        });
+      });
+
+      debugLog("free.cleanup.fail_artifacts.removed", { removed: removed });
+    }
+
     function getReportToken() {
       return getQueryToken() || getPathToken() || getStoredToken() || "";
     }
@@ -741,6 +790,10 @@
       token: token ? (token.slice(0, 4) + "..." + token.slice(-4)) : "",
       href: window.location.href
     });
+    const fromPaymentFail = hasFromPaymentFailFlag();
+    if (fromPaymentFail) {
+      debugLog("free.from_payment_fail.detected", { href: window.location.href });
+    }
     cleanupPremiumState();
     debugLog("free.cleanup.done", {});
 
@@ -758,6 +811,10 @@
       });
 
       frameEl.src = API_BASE + "/r/" + encodeURIComponent(token) + "?v=" + Date.now();
+      if (fromPaymentFail) {
+        removePaymentFailArtifactsAggressive();
+        removeFromPaymentFailFlag();
+      }
       removePaymentFailArtifacts();
 
       frameEl.addEventListener("load", () => {

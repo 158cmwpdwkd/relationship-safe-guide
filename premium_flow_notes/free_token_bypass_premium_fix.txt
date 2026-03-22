@@ -1,0 +1,29 @@
+1. free-report 오염의 직접 원인
+- `app/routes_report.py` 가 token 자체보다 sid 기준으로 premium flow 여부를 판정하고 있었다.
+- 그래서 free token(`t_free_...`) 이더라도 같은 sid 에 order 가 생기면 premium flow 로 오인될 수 있었다.
+- 그 결과 `/r/{free_token}` 이 free report HTML 대신 `NOT_PAID -> payment-fail` 흐름으로 빠졌다.
+
+2. `_is_premium_flow_token()` 또는 분기 로직에서 무엇이 잘못됐는지
+- 기존 `_is_premium_flow_token()` 는 `report.sid` 기준으로
+  - order 존재
+  - paid survey 존재
+  - premium content 존재
+만 봤다.
+- token 이 free token 인지 여부를 보지 않아서, free token 이 premium 흐름으로 잘못 분류될 수 있었다.
+
+3. free token을 어떻게 premium flow에서 제외했는지
+- `_is_free_report_token(token)` 추가
+- `resolve_report_html(token)` 에서 free token 여부를 가장 먼저 판정
+- free token 이면 `resolve_premium_state()` 전에 바로 `make_report_html(...)` 반환
+- `_is_premium_flow_token()` 도 free token 이면 무조건 `False` 반환하도록 보강
+
+4. 수정한 파일 목록
+- app/routes_report.py
+
+5. 테스트 시나리오
+- free token 최초 진입
+  - `/r/{t_free_...}` 가 free report HTML 반환하는지 확인
+- free token 상태에서 결제 시도 후 다시 `/report?token=t_free_...`
+  - sid 에 order 가 생겨도 free report 가 유지되는지 확인
+- iframe `/r/{free_token}` 호출 시 payment-fail 안 뜨는지 확인
+- free report 정상 렌더되는지 확인
