@@ -79,9 +79,6 @@
       opacity: .95;
     }
 
-    /* ──────────────────────────
-       NAV
-       ────────────────────────── */
     #rcl-nav{
       position: fixed;
       top: 0; left: 0; width: 100%;
@@ -147,9 +144,6 @@
       box-shadow: 0 0 5px var(--teal);
     }
 
-    /* ──────────────────────────
-       MAIN
-       ────────────────────────── */
     #rcl-main{
       padding-top: calc(var(--nav-h)+24px);
       width: 100%;
@@ -168,9 +162,6 @@
       }
     }
 
-    /* ──────────────────────────
-       LOADING / ERROR / STATE
-       ────────────────────────── */
     #rcl-loading,
     #rcl-error,
     #rcl-state{
@@ -215,9 +206,6 @@
       font-size: 15px;
     }
 
-    /* ──────────────────────────
-       IFRAME
-       ────────────────────────── */
     #rcl-frame-wrap{
       display:none;
       width:100%;
@@ -234,16 +222,13 @@
       min-height:0;
       opacity:0;
       overflow:hidden;
-      transition:height .3s ease, opacity .4s ease;
+      transition:opacity .4s ease;
     }
 
     #rcl-report-frame.loaded{
       opacity:1;
     }
 
-    /* ──────────────────────────
-       FOOTER
-       ────────────────────────── */
     #rcl-footer{
       background: var(--bg);
       color: #7a8593;
@@ -381,8 +366,8 @@
       </div>
 
       <p class="footer-disclaimer">
-        본 서비스의 분석 결과는 자체 데이터 모델 기반의 참고 추정치이며, 법적 효력을 갖는 통계가 아닙니다.<br />
-        개인별 상황에 따라 결과가 다를 수 있으며, 본 서비스는 감정 자극이 아니라 안전 중심의 행동 가이드를 제공하기 위한 목적으로 구성됩니다.
+        본 서비스의 분석 결과는 자체 데이터 모델 기반의 참고 추정치이며 법적 효력이나 의학적 진단을 의미하지 않습니다.<br />
+        개인의 상황에 따라 결과는 달라질 수 있으며, 본 서비스는 감정 치유가 아닌 안전 판단과 행동 가이드를 제공하기 위한 목적의 안내입니다.
       </p>
 
       <p class="footer-copy">© 2025 리커넥트랩. All rights reserved.</p>
@@ -397,6 +382,8 @@
     const POLL_INTERVAL_MS = 3000;
     const HEIGHT_DEBOUNCE_MS = 160;
     const HEIGHT_MIN_DELTA = 24;
+    const HEIGHT_SHRINK_GUARD = 0;
+    const DEBUG_LOG_LIMIT = 400;
 
     const loadingEl = document.getElementById("rcl-loading");
     const errorEl = document.getElementById("rcl-error");
@@ -405,16 +392,214 @@
     const stateCopyEl = document.getElementById("rcl-state-copy");
     const stateCtaEl = document.getElementById("rcl-state-cta");
     const frameWrapEl = document.getElementById("rcl-frame-wrap");
-    const frameEl = document.getElementById("rcl-report-frame");
+    let frameEl = document.getElementById("rcl-report-frame");
 
     let lastHeight = 0;
     let pendingHeight = 0;
     let heightRaf = 0;
+    let heightDebounceTimer = 0;
     let lastHeightAppliedAt = 0;
     let pollHandle = null;
     let bootSeq = 0;
     let activeFrameToken = "";
     let currentState = "BOOT";
+    let entryInFlight = false;
+    let frameSessionSeq = 0;
+    let activeFrameSessionId = 0;
+    let debugRenderTimer = 0;
+    let debugPanelEl = null;
+    let debugOutputEl = null;
+    let debugAutoScroll = true;
+    const debugEnabled = (function () {
+      try {
+        return new URLSearchParams(window.location.search).get("debug") === "1";
+      } catch (e) {
+        return false;
+      }
+    })();
+
+    const defaultLoadingTitle = loadingEl.querySelector(".state-title").textContent;
+    const defaultLoadingCopy = loadingEl.querySelector(".state-copy").textContent;
+    const debugBuffer = window.__RCL_DEBUG_LOGS__ = window.__RCL_DEBUG_LOGS__ || [];
+
+    function maskToken(value) {
+      if (!value || typeof value !== "string") return value;
+      if (value.length <= 10) return value;
+      return value.slice(0, 4) + "..." + value.slice(-4);
+    }
+
+    function sanitizeValue(key, value) {
+      if (value == null) return value;
+      if (Array.isArray(value)) {
+        return value.map(function (item) {
+          return sanitizeValue(key, item);
+        });
+      }
+      if (typeof value === "object") {
+        return sanitizePayload(value);
+      }
+      if (typeof value !== "string") return value;
+
+      const lowerKey = String(key || "").toLowerCase();
+      if (lowerKey.indexOf("token") >= 0) {
+        return maskToken(value);
+      }
+      if ((lowerKey === "src" || lowerKey === "url") && value.indexOf("/r/") >= 0) {
+        return value.replace(/\/r\/([^/?#]+)/, function (_, token) {
+          return "/r/" + maskToken(token);
+        });
+      }
+      return value;
+    }
+
+    function sanitizePayload(payload) {
+      if (!payload || typeof payload !== "object") return payload;
+      const out = {};
+      Object.keys(payload).forEach(function (key) {
+        out[key] = sanitizeValue(key, payload[key]);
+      });
+      return out;
+    }
+
+    function pushDebugLog(scope, event, payload) {
+      const entry = {
+        ts: new Date().toISOString(),
+        scope: scope,
+        event: event,
+        payload: sanitizePayload(payload || {}),
+      };
+      debugBuffer.push(entry);
+      if (debugBuffer.length > DEBUG_LOG_LIMIT) {
+        debugBuffer.splice(0, debugBuffer.length - DEBUG_LOG_LIMIT);
+      }
+      scheduleDebugRender();
+      return entry;
+    }
+
+    function formatDebugLogs(limit) {
+      const rows = debugBuffer.slice(-(limit || 300));
+      return rows.map(function (entry) {
+        return "[" + entry.ts + "] [" + entry.scope + "] " + entry.event + " " + JSON.stringify(entry.payload || {});
+      }).join("\n");
+    }
+
+    window.__RCL_EXPORT_DEBUG__ = function (limit) {
+      return formatDebugLogs(limit || 300);
+    };
+
+    function scheduleDebugRender() {
+      if (!debugEnabled || !debugOutputEl || debugRenderTimer) return;
+      debugRenderTimer = setTimeout(function () {
+        debugRenderTimer = 0;
+        debugOutputEl.value = formatDebugLogs(300);
+        if (debugAutoScroll) {
+          debugOutputEl.scrollTop = debugOutputEl.scrollHeight;
+        }
+      }, 80);
+    }
+
+    function initDebugPanel() {
+      if (!debugEnabled || debugPanelEl) return;
+
+      const panel = document.createElement("div");
+      panel.style.position = "fixed";
+      panel.style.right = "12px";
+      panel.style.bottom = "12px";
+      panel.style.width = "min(560px, calc(100vw - 24px))";
+      panel.style.height = "min(42vh, 420px)";
+      panel.style.zIndex = "10050";
+      panel.style.background = "rgba(9,14,24,.96)";
+      panel.style.border = "1px solid rgba(255,255,255,.14)";
+      panel.style.borderRadius = "12px";
+      panel.style.boxShadow = "0 14px 42px rgba(0,0,0,.35)";
+      panel.style.display = "flex";
+      panel.style.flexDirection = "column";
+      panel.style.overflow = "hidden";
+
+      const head = document.createElement("div");
+      head.style.display = "flex";
+      head.style.alignItems = "center";
+      head.style.justifyContent = "space-between";
+      head.style.gap = "8px";
+      head.style.padding = "10px 12px";
+      head.style.borderBottom = "1px solid rgba(255,255,255,.08)";
+      head.style.fontSize = "12px";
+      head.style.fontWeight = "700";
+      head.style.color = "#e8edf6";
+      head.textContent = "RCL Debug Buffer";
+
+      const controls = document.createElement("div");
+      controls.style.display = "flex";
+      controls.style.gap = "6px";
+
+      function makeButton(label, handler) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.style.background = "rgba(255,255,255,.08)";
+        btn.style.color = "#fff";
+        btn.style.border = "1px solid rgba(255,255,255,.14)";
+        btn.style.borderRadius = "8px";
+        btn.style.padding = "6px 10px";
+        btn.style.fontSize = "11px";
+        btn.style.cursor = "pointer";
+        btn.addEventListener("click", handler);
+        return btn;
+      }
+
+      const autoBtn = makeButton("Auto: ON", function () {
+        debugAutoScroll = !debugAutoScroll;
+        autoBtn.textContent = debugAutoScroll ? "Auto: ON" : "Auto: OFF";
+      });
+
+      const copyBtn = makeButton("Copy", function () {
+        const text = formatDebugLogs(300);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).catch(function () {});
+        }
+      });
+
+      const clearBtn = makeButton("Clear", function () {
+        debugBuffer.length = 0;
+        scheduleDebugRender();
+      });
+
+      controls.appendChild(autoBtn);
+      controls.appendChild(copyBtn);
+      controls.appendChild(clearBtn);
+      head.appendChild(controls);
+
+      const output = document.createElement("textarea");
+      output.readOnly = true;
+      output.style.flex = "1";
+      output.style.width = "100%";
+      output.style.background = "#0c1220";
+      output.style.color = "#d9e2ef";
+      output.style.border = "0";
+      output.style.resize = "none";
+      output.style.padding = "12px";
+      output.style.font = "12px/1.45 Consolas, Menlo, monospace";
+      output.style.outline = "none";
+
+      panel.appendChild(head);
+      panel.appendChild(output);
+      document.body.appendChild(panel);
+
+      debugPanelEl = panel;
+      debugOutputEl = output;
+      scheduleDebugRender();
+    }
+
+    function debugLog(event, payload) {
+      const entry = pushDebugLog("wrapper", event, payload || {});
+      if (debugEnabled) {
+        console.debug("[RCL premium wrapper]", entry.event, entry.payload);
+      }
+    }
+
+    function getFrameSrc() {
+      return frameEl ? (frameEl.getAttribute("src") || "") : "";
+    }
 
     function hideAll() {
       loadingEl.style.display = "none";
@@ -423,42 +608,99 @@
       frameWrapEl.style.display = "none";
     }
 
-    function resetFrame() {
+    function clearPolling(reason) {
+      if (pollHandle) {
+        clearTimeout(pollHandle);
+        pollHandle = null;
+        debugLog("poll.clear", { reason: reason || "unspecified" });
+      }
+    }
+
+    function clearHeightWork(reason) {
       pendingHeight = 0;
       if (heightRaf) {
         cancelAnimationFrame(heightRaf);
         heightRaf = 0;
       }
+      if (heightDebounceTimer) {
+        clearTimeout(heightDebounceTimer);
+        heightDebounceTimer = 0;
+      }
       lastHeight = 0;
       lastHeightAppliedAt = 0;
+      debugLog("clearHeightWork", { reason: reason || "unspecified" });
+    }
+
+    function bindFrameEvents() {
+      if (!frameEl) return;
+      frameEl.addEventListener("load", function () {
+        debugLog("frame.load", { state: currentState, src: getFrameSrc(), sessionId: activeFrameSessionId });
+        if (currentState === "READY") {
+          frameEl.classList.add("loaded");
+        }
+      });
+    }
+
+    function recreateFrame(reason) {
+      const next = frameEl.cloneNode(false);
+      next.className = "";
+      next.style.height = "600px";
+      next.removeAttribute("src");
+      frameEl.replaceWith(next);
+      frameEl = next;
+      bindFrameEvents();
+      debugLog("frame.recreate", { reason: reason || "unspecified" });
+    }
+
+    function resetFrame(reason) {
+      debugLog("frame.session.end", {
+        sessionId: activeFrameSessionId,
+        reason: reason || "unspecified",
+        state: currentState,
+        src: getFrameSrc(),
+      });
+      debugLog("resetFrame", { reason: reason || "unspecified", state: currentState, src: getFrameSrc(), sessionId: activeFrameSessionId });
+      clearHeightWork("resetFrame");
       activeFrameToken = "";
-      frameEl.classList.remove("loaded");
-      frameEl.style.height = "600px";
-      if (frameEl.src) {
-        frameEl.removeAttribute("src");
+      activeFrameSessionId = 0;
+      if (frameEl) {
+        frameEl.classList.remove("loaded");
+        frameEl.style.height = "600px";
+      }
+      recreateFrame(reason || "resetFrame");
+    }
+
+    function prepareState(nextState, options) {
+      const keepFrame = !!(options && options.keepFrame);
+      const reason = options && options.reason ? options.reason : "transition";
+      debugLog("state.transition", { from: currentState, to: nextState, reason: reason, keepFrame: keepFrame });
+      clearPolling("transition:" + nextState);
+      hideAll();
+      currentState = nextState;
+      if (keepFrame) {
+        clearHeightWork("keepFrame:" + nextState);
+      } else {
+        resetFrame("deactivate:" + nextState);
       }
     }
 
     function showLoading(title, copy) {
-      currentState = "PROCESSING";
-      hideAll();
-      resetFrame();
+      prepareState("PROCESSING", { keepFrame: false, reason: "showLoading" });
+      debugLog("showLoading", { title: title || defaultLoadingTitle });
       loadingEl.style.display = "flex";
-      loadingEl.querySelector(".state-title").textContent = title || "프리미엄 리포트를 확인하는 중입니다";
-      loadingEl.querySelector(".state-copy").textContent = copy || "잠시만 기다려 주세요.";
+      loadingEl.querySelector(".state-title").textContent = title || defaultLoadingTitle;
+      loadingEl.querySelector(".state-copy").textContent = copy || defaultLoadingCopy;
     }
 
     function showError() {
-      currentState = "ERROR";
-      hideAll();
-      resetFrame();
+      prepareState("ERROR", { keepFrame: false, reason: "showError" });
+      debugLog("showError");
       errorEl.style.display = "flex";
     }
 
     function showState(title, copy, ctaLabel, ctaHref) {
-      currentState = "STATE";
-      hideAll();
-      resetFrame();
+      prepareState("STATE", { keepFrame: false, reason: "showState" });
+      debugLog("showState", { title: title || "", ctaHref: ctaHref || "" });
       stateEl.style.display = "flex";
       stateTitleEl.textContent = title || "";
       stateCopyEl.textContent = copy || "";
@@ -472,15 +714,35 @@
     }
 
     function showFrame(token) {
-      currentState = "READY";
-      hideAll();
-      frameWrapEl.style.display = "block";
-      if (activeFrameToken !== token) {
-        frameEl.classList.remove("loaded");
-        frameEl.style.height = "600px";
-        frameEl.src = API_BASE + "/r/" + encodeURIComponent(token);
-        activeFrameToken = token;
+      const nextSrc = API_BASE + "/r/" + encodeURIComponent(token);
+      const currentSrc = getFrameSrc();
+      const reusable =
+        currentState === "READY" &&
+        activeFrameToken === token &&
+        currentSrc === nextSrc &&
+        !!currentSrc;
+
+      debugLog("showFrame", {
+        token: token,
+        reusable: reusable,
+        state: currentState,
+        currentSrc: currentSrc,
+      });
+
+      if (reusable) {
+        hideAll();
+        frameWrapEl.style.display = "block";
+        return;
       }
+
+      prepareState("READY", { keepFrame: false, reason: "showFrame" });
+      activeFrameSessionId = ++frameSessionSeq;
+      debugLog("frame.session.start", { sessionId: activeFrameSessionId, token: token, src: nextSrc });
+      frameWrapEl.style.display = "block";
+      frameEl.style.height = "600px";
+      frameEl.classList.remove("loaded");
+      frameEl.src = nextSrc;
+      activeFrameToken = token;
     }
 
     function getQueryToken() {
@@ -521,82 +783,155 @@
     async function fetchEntry(token) {
       const url = new URL(ENTRY_URL);
       url.searchParams.set("token", token);
+      debugLog("entry.fetch.start", { token: token, url: url.toString() });
       const res = await fetch(url.toString(), { method: "GET" });
+      debugLog("entry.fetch.end", { token: token, ok: res.ok, status: res.status });
       if (!res.ok) {
         throw new Error("ENTRY_FETCH_FAILED");
       }
       return res.json();
     }
 
-    function clearPolling() {
-      if (pollHandle) {
-        clearTimeout(pollHandle);
-        pollHandle = null;
-      }
-    }
-
     function scheduleRecheck(token) {
-      clearPolling();
+      clearPolling("reschedule");
+      if (currentState !== "PROCESSING") {
+        debugLog("scheduleRecheck.skip", { reason: "state_not_processing", state: currentState, token: token });
+        return;
+      }
       pollHandle = setTimeout(function () {
+        debugLog("poll.fire", { token: token });
         boot(token);
       }, POLL_INTERVAL_MS);
+      debugLog("poll.schedule", { token: token, delay: POLL_INTERVAL_MS });
     }
 
-    function applyFrameHeight(target) {
+    function applyFrameHeight(target, sessionId) {
       pendingHeight = target;
       if (heightRaf) return;
 
       heightRaf = requestAnimationFrame(function () {
         heightRaf = 0;
+        const expectedSessionId = sessionId || activeFrameSessionId;
+
+        if (currentState !== "READY") {
+          debugLog("height.ignore", {
+            reason: "state_not_ready",
+            state: currentState,
+            incoming: pendingHeight,
+            sessionId: expectedSessionId,
+            activeSessionId: activeFrameSessionId,
+          });
+          pendingHeight = 0;
+          return;
+        }
+        if (!expectedSessionId || expectedSessionId !== activeFrameSessionId) {
+          debugLog("height.ignore", {
+            reason: "stale_session",
+            incoming: pendingHeight,
+            sessionId: expectedSessionId,
+            activeSessionId: activeFrameSessionId,
+          });
+          pendingHeight = 0;
+          return;
+        }
 
         const now = Date.now();
         if ((now - lastHeightAppliedAt) < HEIGHT_DEBOUNCE_MS) {
-          setTimeout(function () {
-            applyFrameHeight(pendingHeight);
-          }, HEIGHT_DEBOUNCE_MS - (now - lastHeightAppliedAt));
+          const delay = HEIGHT_DEBOUNCE_MS - (now - lastHeightAppliedAt);
+          if (heightDebounceTimer) {
+            clearTimeout(heightDebounceTimer);
+          }
+          heightDebounceTimer = setTimeout(function () {
+            heightDebounceTimer = 0;
+            applyFrameHeight(pendingHeight, expectedSessionId);
+          }, delay);
+          debugLog("height.defer", {
+            targetHeight: pendingHeight,
+            debounceDelay: delay,
+            sessionId: expectedSessionId,
+          });
           return;
         }
 
         const next = pendingHeight;
+        const currentHeight = lastHeight;
         pendingHeight = 0;
 
-        if (!next) return;
-        if (Math.abs(next - lastHeight) <= HEIGHT_MIN_DELTA) return;
-        if (next < lastHeight && (lastHeight - next) < 96) return;
+        if (!next) {
+          debugLog("height.ignore", { reason: "invalid_height", sessionId: expectedSessionId });
+          return;
+        }
+        if (Math.abs(next - currentHeight) <= HEIGHT_MIN_DELTA) {
+          debugLog("height.ignore", {
+            reason: "below_delta",
+            incoming: next,
+            previous: currentHeight,
+            delta: next - currentHeight,
+            sessionId: expectedSessionId,
+          });
+          return;
+        }
+        if (next < currentHeight && (currentHeight - next) < HEIGHT_SHRINK_GUARD) {
+          debugLog("height.ignore", {
+            reason: "shrink_guard",
+            incoming: next,
+            previous: currentHeight,
+            delta: next - currentHeight,
+            sessionId: expectedSessionId,
+          });
+          return;
+        }
 
         frameEl.style.height = next + "px";
         lastHeight = next;
         lastHeightAppliedAt = Date.now();
+        debugLog("height.apply", {
+          finalAppliedHeight: next,
+          previous: currentHeight,
+          delta: next - currentHeight,
+          applied: true,
+          sessionId: expectedSessionId,
+        });
       });
     }
 
     async function boot(initialToken) {
-      const seq = ++bootSeq;
       const token = initialToken || getToken();
       if (!token) {
-        clearPolling();
+        debugLog("boot.skip", { reason: "missing_token" });
+        clearPolling("missing_token");
         showError();
         return;
       }
 
+      if (entryInFlight) {
+        debugLog("boot.skip", { reason: "entry_in_flight", token: token });
+        return;
+      }
+
+      const seq = ++bootSeq;
+      entryInFlight = true;
       setStoredToken(token);
-      showLoading("프리미엄 리포트를 확인하는 중입니다", "잠시만 기다려 주세요.");
+      showLoading(defaultLoadingTitle, defaultLoadingCopy);
 
       try {
         const data = await fetchEntry(token);
-        if (seq !== bootSeq) return;
+        if (seq !== bootSeq) {
+          debugLog("boot.stale", { seq: seq, bootSeq: bootSeq, token: token });
+          return;
+        }
+
         const state = data.state || "";
+        debugLog("boot.resolve", { token: token, state: state });
 
         if (state === "INVALID_REPORT_TOKEN") {
-          clearPolling();
           showError();
           return;
         }
 
         if (state === "NOT_PAID") {
-          clearPolling();
           showState(
-            "결제가 필요합니다",
+            "결제가 필요합니다.",
             data.user_message || "프리미엄 리포트를 보려면 결제를 완료해 주세요.",
             "결제 진행하기",
             data.next_url || ("/premium?token=" + encodeURIComponent(token))
@@ -605,9 +940,8 @@
         }
 
         if (state === "NEED_SURVEY") {
-          clearPolling();
           showState(
-            "유료 설문 작성이 필요합니다",
+            "유료 설문 작성이 필요합니다.",
             data.user_message || "설문 작성 후 프리미엄 리포트가 생성됩니다.",
             "설문 작성하기",
             data.next_url || "#"
@@ -625,42 +959,85 @@
         }
 
         if (state === "READY") {
-          clearPolling();
           showFrame(token);
           return;
         }
 
-        clearPolling();
         showError();
       } catch (e) {
-        if (seq !== bootSeq) return;
-        clearPolling();
+        if (seq !== bootSeq) {
+          debugLog("boot.error.stale", { seq: seq, bootSeq: bootSeq, token: token });
+          return;
+        }
+        debugLog("boot.error", { token: token, message: e && e.message ? e.message : String(e) });
         showError();
+      } finally {
+        if (seq === bootSeq) {
+          entryInFlight = false;
+        }
       }
     }
 
-    frameEl.addEventListener("load", function () {
-      frameEl.classList.add("loaded");
-    });
-
-    window.addEventListener("message", function (event) {
+    function onWrapperMessage(event) {
       const origin = event.origin || "";
       if (
         !origin.startsWith("https://relationship-safe-guide-api.onrender.com") &&
         !origin.startsWith("http://localhost") &&
         !origin.startsWith("http://127.0.0.1")
       ) {
+        debugLog("message.ignore", { reason: "origin", origin: origin });
         return;
       }
 
       const data = event.data;
+      if (data && data.type === "RCL_DEBUG_LOG" && data.payload) {
+        pushDebugLog("renderer", data.event || "debug", data.payload);
+        return;
+      }
       if (!data || data.type !== "RCL_REPORT_HEIGHT") return;
-      if (typeof data.height !== "number" || data.height <= 0) return;
-      if (currentState !== "READY") return;
+      if (typeof data.height !== "number" || data.height <= 0) {
+        debugLog("message.ignore", { reason: "invalid_height", data: data, sessionId: activeFrameSessionId });
+        return;
+      }
+      if (currentState !== "READY") {
+        debugLog("message.ignore", {
+          reason: "state_not_ready",
+          state: currentState,
+          incoming: data.height,
+          currentHeight: lastHeight,
+          sessionId: activeFrameSessionId,
+        });
+        return;
+      }
 
-      const target = Math.min(Math.max(data.height + 72, 720), 14000);
-      applyFrameHeight(target);
-    });
+      debugLog("message.receive", {
+        sessionId: activeFrameSessionId,
+        state: currentState,
+        incomingRawHeight: data.height,
+        currentAppliedHeight: lastHeight,
+        delta: data.height - lastHeight,
+      });
+
+      const target = Math.min(Math.max(data.height, 720), 14000);
+      debugLog("message.target", {
+        sessionId: activeFrameSessionId,
+        incomingRawHeight: data.height,
+        computedTargetHeight: target,
+        previousAppliedHeight: lastHeight,
+        delta: target - lastHeight,
+      });
+      applyFrameHeight(target, activeFrameSessionId);
+    }
+
+    bindFrameEvents();
+
+    if (!window.__rclPremiumWrapperMessageBound) {
+      window.addEventListener("message", onWrapperMessage);
+      window.__rclPremiumWrapperMessageBound = true;
+      debugLog("listener.bind", { type: "message" });
+    }
+
+    initDebugPanel();
 
     document.querySelector("#rcl-nav .logo").addEventListener("click", function (e) {
       e.preventDefault();

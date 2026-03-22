@@ -1,0 +1,108 @@
+1. 가장 큰 실제 원인 가설 1개
+
+- state/polling 자체보다 `height feedback loop` 가능성이 더 높았다.
+- 특히 wrapper의 `iframe height transition`, wrapper의 `+72` 보정, shrink guard로 인한 overshoot 복구 방해, renderer의 반복 측정이 함께 작동하면 높이가 중간값을 거치며 계속 증가/재측정될 수 있다.
+
+2. wrapper에서 제거/완화한 항목
+
+- 파일: `imweb/premium_report.html`
+- 수정 내용
+  - `#rcl-report-frame`
+    - `transition: height .3s ease` 제거
+    - `opacity .4s ease`만 유지
+  - `HEIGHT_SHRINK_GUARD`
+    - `96 -> 0`
+  - `message -> target` 계산
+    - 기존: `data.height + 72`
+    - 변경: raw `data.height`
+  - height 로그 강화
+    - `incomingRawHeight`
+    - `computedTargetHeight`
+    - `previousAppliedHeight`
+    - `delta`
+    - apply / ignore reason
+
+3. renderer에서 확인한 측정 패턴
+
+- 파일: `app/services/reporting/premium_renderer.py`
+- 기존 구조 유지
+  - `DOMContentLoaded`
+  - `load`
+  - `fonts.ready`
+  - `ResizeObserver`
+  - `resize`
+  에서 높이 재측정
+
+- 이번 라운드 수정
+  - 각 측정 트리거를 `source`로 로그에 남기도록 변경
+  - `sendHeight(force, source)`
+  - `requestHeight(force, source)`
+  - `scheduleHeightBursts(source)`
+
+- 측정 기준 정리
+  - `clientHeight` 계열을 빼고
+  - `body.scrollHeight`, `documentElement.scrollHeight`, `body.offsetHeight`, `documentElement.offsetHeight`
+    중심으로 계산
+  - viewport 기반 값이 height에 직접 끼어드는 가능성을 낮춤
+
+4. raw incoming height 변화 패턴
+
+- wrapper 콘솔에서 확인하도록 로그를 추가했다.
+- 예상 관찰 포인트
+  - `message.receive`
+    - `incomingRawHeight`
+    - `previousAppliedHeight`
+  - `message.target`
+    - raw 값과 target 값 차이
+  - `height.apply`
+    - 실제 반영된 높이와 delta
+  - `height.ignore`
+    - `below_delta`
+    - `shrink_guard`
+    - `state_not_ready`
+
+- 핵심은 raw incoming 값이
+  - `안정되는지`
+  - `계속 조금씩 증가하는지`
+  - `transition 제거 후 바로 수렴하는지`
+  를 보는 것이다.
+
+5. 왜 state loop보다 height feedback loop로 판단했는지
+
+- wrapper는 이미 `READY` 외 상태에서 polling과 iframe 비활성화가 상당 부분 정리되어 있었다.
+- 그럼에도 READY 화면에서 스크롤이 계속 흔들린다면,
+  - 높이 애니메이션
+  - 보정값
+  - shrink guard
+  - renderer 반복 측정
+  조합이 더 직접적인 원인이다.
+- 특히 `+72` 보정은 매번 실제 콘텐츠보다 크게 적용된 intermediate height를 만들고,
+  그 intermediate layout 변화가 다시 renderer 측정값에 반영될 수 있다.
+
+6. 최종 검증 방법
+
+1. READY 상태 premium 리포트 진입
+   - DevTools 콘솔에서 `message.receive -> message.target -> height.apply` 로그 확인
+   - 1~2회 내 높이가 수렴하는지 확인
+
+2. wrapper target 확인
+   - `incomingRawHeight`와 `computedTargetHeight`가 같은지 확인
+   - 더 이상 `+72` 보정이 없는지 확인
+
+3. overshoot 복구 확인
+   - 큰 높이가 한 번 적용된 뒤 실제 높이가 더 작게 측정되면, 다시 내려오는지 확인
+   - `shrink_guard`가 사실상 막지 않는지 확인
+
+4. renderer 트리거 확인
+   - `[RCL premium renderer] sendHeight`
+   - `source`
+   - `measuredHeight`
+   를 보고 어떤 트리거가 반복되는지 확인
+
+5. state/polling 잔루프 분리 확인
+   - READY에서 `poll.fire`가 없어야 함
+   - 문제가 남으면 state loop가 아니라 pure height loop로 더 확정 가능
+
+7. 남은 리스크 1개
+
+- renderer 콘텐츠 자체가 iframe 높이 변화에 민감한 CSS나 레이아웃 계산을 포함하고 있으면, transition 제거 후에도 `ResizeObserver`가 여러 번 반응할 수 있다. 다만 이번 라운드에서는 raw height와 source 로그가 추가되어 원인 추적은 훨씬 쉬워진 상태다.

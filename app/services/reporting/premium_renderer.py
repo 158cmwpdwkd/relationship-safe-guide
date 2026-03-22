@@ -543,14 +543,25 @@ def _shell(inner_html: str, *, state: str) -> str:
     var body = document.body;
     if (!docEl || !body) return 0;
 
-    return Math.max(
-      docEl.scrollHeight || 0,
-      docEl.offsetHeight || 0,
-      docEl.clientHeight || 0,
-      body.scrollHeight || 0,
-      body.offsetHeight || 0,
-      body.clientHeight || 0
-    );
+    var candidates = {{
+      bodyScrollHeight: body.scrollHeight || 0,
+      docScrollHeight: docEl.scrollHeight || 0,
+      bodyOffsetHeight: body.offsetHeight || 0,
+      docOffsetHeight: docEl.offsetHeight || 0
+    }};
+    var selectedKey = "bodyScrollHeight";
+    var selectedValue = candidates.bodyScrollHeight;
+    Object.keys(candidates).forEach(function(key) {{
+      if (candidates[key] > selectedValue) {{
+        selectedKey = key;
+        selectedValue = candidates[key];
+      }}
+    }});
+    return {{
+      height: selectedValue,
+      selectedKey: selectedKey,
+      candidates: candidates
+    }};
   }}
 
   var lastSentHeight = 0;
@@ -558,63 +569,149 @@ def _shell(inner_html: str, *, state: str) -> str:
   var lastSentAt = 0;
   var rafId = 0;
   var resizeTimer = 0;
-  function sendHeight(force) {{
+  var sourceCounters = {{}};
+  var sourceCounterWindowStart = Date.now();
+  function emitDebug(event, payload) {{
+    var body = Object.assign({{
+      ts: new Date().toISOString(),
+      scope: "renderer",
+      event: event
+    }}, payload || {{}});
+    try {{
+      window.parent.postMessage({{ type: "RCL_DEBUG_LOG", event: event, payload: body }}, "*");
+    }} catch (e) {{}}
+    console.debug("[RCL premium renderer]", event, body);
+  }}
+  function sendHeight(force, source) {{
     var now = Date.now();
-    var h = calcHeight();
-    if (!h) return;
-    if ((now - lastSentAt) < 180) return;
-    if (Math.abs(h - lastSentHeight) <= 8) return;
-    if (!force && Math.abs(h - lastMeasuredHeight) <= 8) return;
+    var measurement = calcHeight();
+    var h = measurement.height;
+    var delta = h - lastSentHeight;
+    if ((now - sourceCounterWindowStart) > 1000) {{
+      sourceCounters = {{}};
+      sourceCounterWindowStart = now;
+    }}
+    var sourceKey = source || "unknown";
+    sourceCounters[sourceKey] = (sourceCounters[sourceKey] || 0) + 1;
+    if (!h) {{
+      emitDebug("ignoreHeight", {{
+        source: sourceKey,
+        reason: "invalid_height",
+        measuredHeight: h,
+        lastSentHeight: lastSentHeight,
+        delta: delta,
+        candidates: measurement.candidates,
+        selectedKey: measurement.selectedKey,
+        perSecondCount: sourceCounters[sourceKey]
+      }});
+      return;
+    }}
+    if ((now - lastSentAt) < 180) {{
+      emitDebug("ignoreHeight", {{
+        source: sourceKey,
+        reason: "throttled",
+        measuredHeight: h,
+        lastSentHeight: lastSentHeight,
+        delta: delta,
+        candidates: measurement.candidates,
+        selectedKey: measurement.selectedKey,
+        perSecondCount: sourceCounters[sourceKey]
+      }});
+      return;
+    }}
+    if (Math.abs(h - lastSentHeight) <= 8) {{
+      emitDebug("ignoreHeight", {{
+        source: sourceKey,
+        reason: "same_height",
+        measuredHeight: h,
+        lastSentHeight: lastSentHeight,
+        delta: delta,
+        candidates: measurement.candidates,
+        selectedKey: measurement.selectedKey,
+        perSecondCount: sourceCounters[sourceKey]
+      }});
+      return;
+    }}
+    if (!force && Math.abs(h - lastMeasuredHeight) <= 8) {{
+      emitDebug("ignoreHeight", {{
+        source: sourceKey,
+        reason: "below_threshold",
+        measuredHeight: h,
+        lastSentHeight: lastSentHeight,
+        lastMeasuredHeight: lastMeasuredHeight,
+        delta: h - lastMeasuredHeight,
+        candidates: measurement.candidates,
+        selectedKey: measurement.selectedKey,
+        perSecondCount: sourceCounters[sourceKey]
+      }});
+      return;
+    }}
+    emitDebug("sendHeight", {{
+      source: sourceKey,
+      measuredHeight: h,
+      lastSentHeight: lastSentHeight,
+      lastMeasuredHeight: lastMeasuredHeight,
+      delta: delta,
+      force: !!force,
+      selectedKey: measurement.selectedKey,
+      candidates: measurement.candidates,
+      perSecondCount: sourceCounters[sourceKey]
+    }});
     lastMeasuredHeight = h;
     lastSentHeight = h;
     lastSentAt = now;
     window.parent.postMessage({{ type: "RCL_REPORT_HEIGHT", height: h }}, "*");
   }}
 
-  function requestHeight(force) {{
+  function requestHeight(force, source) {{
     if (rafId) {{
       cancelAnimationFrame(rafId);
     }}
     rafId = requestAnimationFrame(function() {{
       rafId = 0;
-      sendHeight(!!force);
+      sendHeight(!!force, source);
     }});
   }}
 
-  function scheduleHeightBursts() {{
-    requestHeight(true);
-    setTimeout(function() {{ requestHeight(true); }}, 160);
-    setTimeout(function() {{ requestHeight(true); }}, 420);
-    setTimeout(function() {{ requestHeight(true); }}, 1000);
+  function scheduleHeightBursts(source) {{
+    requestHeight(true, source + ":burst0");
+    setTimeout(function() {{ requestHeight(true, source + ":burst160"); }}, 160);
+    setTimeout(function() {{ requestHeight(true, source + ":burst420"); }}, 420);
+    setTimeout(function() {{ requestHeight(true, source + ":burst1000"); }}, 1000);
   }}
 
   document.addEventListener("DOMContentLoaded", function() {{
-    scheduleHeightBursts();
+    emitDebug("source.fire", {{ source: "DOMContentLoaded" }});
+    scheduleHeightBursts("DOMContentLoaded");
   }});
 
   window.addEventListener("load", function() {{
     window.parent.postMessage({{ type: "RCL_PREMIUM_STATE", state: "{escape(state)}" }}, "*");
-    scheduleHeightBursts();
+    emitDebug("source.fire", {{ source: "load" }});
+    scheduleHeightBursts("load");
   }});
 
   window.addEventListener("resize", function() {{
-    requestHeight(true);
+    emitDebug("source.fire", {{ source: "resize" }});
+    requestHeight(true, "resize");
   }});
 
   if (document.fonts && document.fonts.ready) {{
     document.fonts.ready.then(function() {{
-      scheduleHeightBursts();
+      emitDebug("source.fire", {{ source: "fonts.ready" }});
+      scheduleHeightBursts("fonts.ready");
     }}).catch(function() {{}});
   }}
 
   if (window.ResizeObserver) {{
     var ro = new ResizeObserver(function() {{
+      emitDebug("source.fire", {{ source: "ResizeObserver" }});
       if (resizeTimer) {{
         clearTimeout(resizeTimer);
       }}
       resizeTimer = setTimeout(function() {{
         resizeTimer = 0;
-        requestHeight(false);
+        requestHeight(false, "ResizeObserver");
       }}, 140);
     }});
     ro.observe(document.documentElement);
