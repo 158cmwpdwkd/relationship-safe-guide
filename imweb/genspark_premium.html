@@ -1,0 +1,641 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>프리미엄 리포트</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+:root{
+  --bg:#09111F;
+  --bg2:#101A2E;
+  --bg3:#131D33;
+  --bg4:#18243D;
+  --txt:#F5EFE8;
+  --sub:#93A1B5;
+  --rose:#C88968;
+  --rose-lt:#E1B08D;
+  --gold:#D9B46D;
+  --teal:#4ECDC4;
+  --amber:#C9984C;
+  --red:#D96B6B;
+  --line:rgba(200,137,104,.16);
+  --line2:rgba(255,255,255,.05);
+  --radius:18px;
+  --shadow-soft:0 22px 50px rgba(3,8,18,.34);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--txt);
+  font-family:'Noto Sans KR',sans-serif;
+  font-size:16px;
+  line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+.report-root{
+  width:100%;
+  min-height:100vh;
+  padding:20px 0 8px;
+  display:flow-root;
+}
+.wrap{
+  max-width:1088px;
+  margin:0 auto;
+  padding:36px 24px 72px;
+}
+.hero,.content,.metric-card,.metric-bar,.help-card,.state-card{
+  background:var(--bg2);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-soft);
+}
+.hero{
+  padding:34px 32px 28px;
+  margin-bottom:24px;
+  position:relative;
+  overflow:hidden;
+}
+.hero::before{
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  width:4px;
+  height:100%;
+  background:var(--rose);
+}
+.hero-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:10px;
+}
+.hero-title{
+  font-size:28px;
+  font-weight:800;
+  line-height:1.35;
+  margin-bottom:8px;
+}
+.hero-meta{
+  font-size:14px;
+  color:var(--sub);
+}
+.hero-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--gold);
+  border:1px solid rgba(217,180,109,.24);
+  border-radius:100px;
+  padding:5px 13px;
+  white-space:nowrap;
+  background:rgba(217,180,109,.08);
+}
+.lead{
+  max-width:720px;
+  font-size:15px;
+  color:var(--sub);
+  line-height:1.85;
+}
+.metrics-panel{margin-bottom:24px}
+.metrics-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:18px;
+  margin-bottom:18px;
+}
+.metric-card{
+  background:linear-gradient(180deg,rgba(24,36,61,.96),rgba(14,22,39,.98));
+  border-color:var(--line2);
+  padding:20px 20px 18px;
+}
+.metric-title{
+  font-size:12px;
+  color:var(--sub);
+  margin-bottom:12px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.metric-value-row{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:10px;
+}
+.metric-value{
+  font-size:17px;
+  font-weight:700;
+  color:var(--rose-lt);
+}
+.metric-score{
+  font-size:32px;
+  font-weight:800;
+  color:#fff;
+  line-height:1;
+}
+.metric-summary{
+  font-size:13px;
+  line-height:1.75;
+  color:var(--sub);
+}
+.card-bar{
+  width:100%;
+  height:6px;
+  background:rgba(255,255,255,.05);
+  border-radius:100px;
+  overflow:hidden;
+  margin-top:14px;
+}
+.card-bar-fill{
+  height:100%;
+  border-radius:100px;
+  background:linear-gradient(90deg,var(--gold),var(--rose));
+}
+.bars{display:grid;gap:14px}
+.metric-bar{
+  padding:18px 20px;
+  background:linear-gradient(180deg,rgba(22,34,56,.96),rgba(12,20,35,.98));
+}
+.metric-bar-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+.metric-bar-title{
+  font-size:15px;
+  font-weight:700;
+  color:#fff;
+  margin-bottom:4px;
+}
+.metric-bar-state{
+  font-size:13px;
+  color:var(--sub);
+}
+.metric-bar-score{
+  font-size:30px;
+  font-weight:800;
+  color:#fff;
+}
+.metric-bar-track{
+  width:100%;
+  height:8px;
+  background:rgba(255,255,255,.05);
+  border-radius:100px;
+  overflow:hidden;
+}
+.metric-bar-fill{
+  height:100%;
+  border-radius:100px;
+  background:linear-gradient(90deg,var(--gold),var(--rose));
+}
+.content{
+  padding:34px 34px 40px;
+  background:rgba(16,26,46,.92);
+}
+.content h1{
+  font-size:30px;
+  font-weight:800;
+  margin:0 0 26px;
+}
+.content h2{
+  font-size:22px;
+  font-weight:800;
+  margin:40px 0 14px;
+  letter-spacing:-.01em;
+}
+.content h3{
+  font-size:17px;
+  font-weight:700;
+  margin:24px 0 10px;
+  color:var(--gold);
+}
+.content p{
+  margin:0 0 18px;
+  font-size:16px;
+  line-height:1.95;
+  color:var(--txt);
+}
+.content ul,.content ol{
+  margin:0 0 18px;
+  padding:0;
+  list-style:none;
+}
+.content li{
+  position:relative;
+  padding-left:20px;
+  margin:0 0 12px;
+  color:var(--txt);
+  line-height:1.85;
+}
+.content ul li::before{
+  content:'';
+  position:absolute;
+  left:2px;
+  top:.75em;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:var(--gold);
+}
+.content blockquote{
+  margin:24px 0;
+  padding:18px 20px;
+  background:rgba(200,137,104,.08);
+  border-left:3px solid var(--rose);
+  border-radius:0 14px 14px 0;
+}
+.help-card{
+  margin-top:24px;
+  padding:24px;
+  background:rgba(16,26,46,.92);
+}
+.help-title{
+  font-size:20px;
+  font-weight:800;
+  margin-bottom:18px;
+}
+.contact-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+}
+.contact-card{
+  background:linear-gradient(180deg,rgba(24,36,61,.96),rgba(14,22,39,.98));
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:18px 16px;
+}
+.contact-num{
+  font-size:26px;
+  font-weight:800;
+  margin-bottom:8px;
+}
+.contact-label{
+  font-size:14px;
+  color:var(--sub);
+  line-height:1.7;
+}
+.footer{
+  margin-top:30px;
+  text-align:center;
+  font-size:13px;
+  color:rgba(147,161,181,.72);
+  line-height:1.9;
+}
+.state-wrap{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px 18px;
+}
+.state-card{
+  width:100%;
+  max-width:560px;
+  padding:28px 22px;
+  text-align:center;
+}
+.state-badge{
+  display:inline-block;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--rose);
+  border:1px solid rgba(212,145,108,.25);
+  border-radius:100px;
+  padding:4px 12px;
+  margin-bottom:14px;
+}
+.state-title{
+  font-size:22px;
+  font-weight:800;
+  margin-bottom:8px;
+}
+.state-copy{
+  font-size:14px;
+  color:var(--sub);
+  line-height:1.8;
+  margin-bottom:18px;
+}
+.state-cta{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:48px;
+  padding:0 20px;
+  border-radius:999px;
+  border:none;
+  text-decoration:none;
+  background:linear-gradient(135deg,var(--rose),#BE7D5A);
+  color:#fff;
+  font-weight:700;
+}
+@media (max-width:680px){
+  .report-root{padding:16px 0 8px}
+  .wrap{padding:18px 12px 44px}
+  .hero{padding:20px 16px 18px}
+  .hero-title{font-size:22px}
+  .content{padding:22px 16px 28px}
+  .content h1{font-size:24px}
+  .content h2{font-size:19px;margin:30px 0 12px}
+  .help-card{padding:18px}
+  .metrics-grid{grid-template-columns:1fr}
+  .contact-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="report-root">
+
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <div class="hero-title">관계 진단 리포트</div>
+          <div class="hero-meta">분석 완료 · ReconnectLab</div>
+        </div>
+        <div class="hero-badge">PREMIUM</div>
+      </div>
+      <div class="lead">무료 진단보다 더 구체적인 관계 해석과 행동 가이드를 정리한 프리미엄 리포트입니다.</div>
+    </section>
+
+    
+    <section class="metrics-panel">
+      <section class="metrics-grid">
+        
+      <section class="metric-card" data-metric-id="relationship_distance">
+        <div class="metric-title">📏 관계 거리감</div>
+        <div class="metric-value-row">
+          <div class="metric-value">📍 벌어짐</div>
+          <div class="metric-score">58</div>
+        </div>
+        <div class="metric-summary">현재 관계가 얼마나 멀어진 상태로 보이는지 정리한 지표입니다. 종료감, 상대의 개방성, 경계 관련 신호를 바탕으로 해석하며, 성공 가능성을 뜻하지는 않습니다.</div>
+        <div class="card-bar"><div class="card-bar-fill" style="width:58%"></div></div>
+      </section>
+
+      <section class="metric-card" data-metric-id="emotional_temperature">
+        <div class="metric-title">🌡 감정 온도</div>
+        <div class="metric-value-row">
+          <div class="metric-value">💫 불안정함</div>
+          <div class="metric-score">47</div>
+        </div>
+        <div class="metric-summary">현재 상태의 감정 강도와 흔들림을 보여주는 지표입니다. 관계의 좋고 나쁨이 아니라 감정 조절 필요성을 반영합니다.</div>
+        <div class="card-bar"><div class="card-bar-fill" style="width:47%"></div></div>
+      </section>
+
+      <section class="metric-card" data-metric-id="contact_timing">
+        <div class="metric-title">⏳ 연락 타이밍</div>
+        <div class="metric-value-row">
+          <div class="metric-value">⏸ 기다리며 재평가</div>
+          <div class="metric-score">43</div>
+        </div>
+        <div class="metric-summary">어떤 접근이든 시도하기 전에 어느 정도의 시간 간격과 자제가 필요한지 보여주는 지표입니다. 행동을 권하는 신호가 아니라 판단을 제한하는 기준입니다.</div>
+        <div class="card-bar"><div class="card-bar-fill" style="width:43%"></div></div>
+      </section>
+
+      <section class="metric-card" data-metric-id="current_risk_signal">
+        <div class="metric-title">🚨 현재 위험 신호</div>
+        <div class="metric-value-row">
+          <div class="metric-value">🟡 주의 필요</div>
+          <div class="metric-score">58</div>
+        </div>
+        <div class="metric-summary">현재 위험 패턴을 안전 우선 관점에서 해석한 결과입니다. 정서적 흔들림이 커 충동적 판단 가능성을 고려해야 합니다.</div>
+        <div class="card-bar"><div class="card-bar-fill" style="width:58%"></div></div>
+      </section>
+
+      </section>
+      <section class="bars">
+        
+      <section class="metric-bar" data-metric-id="recovery_conditions">
+        <div class="metric-bar-head">
+          <div>
+            <div class="metric-bar-title">🌱 회복 가능 조건</div>
+            <div class="metric-bar-state">🔒 매우 제한적</div>
+          </div>
+          <div class="metric-bar-score">42</div>
+        </div>
+        <div class="metric-bar-track"><div class="metric-bar-fill" style="width:42%"></div></div>
+      </section>
+
+      <section class="metric-bar" data-metric-id="emotional_stability">
+        <div class="metric-bar-head">
+          <div>
+            <div class="metric-bar-title">🧠 감정 안정도</div>
+            <div class="metric-bar-state">🌀 흔들리는 상태</div>
+          </div>
+          <div class="metric-bar-score">49</div>
+        </div>
+        <div class="metric-bar-track"><div class="metric-bar-fill" style="width:49%"></div></div>
+      </section>
+
+      </section>
+    </section>
+
+
+    <main class="content">
+      <h1>리커넥트랩 프리미엄 리포트</h1>
+<h2>1. 현재 상태 정밀 진단</h2>
+<p>현재 관계는 종료 신호가 매우 강하게 형성되어 있으나, 상대방의 일부 개방 신호가 동시에 관찰되어 단순한 해석이 어렵습니다. 이처럼 종료 강도와 개방성 신호가 혼재하는 국면에서는 작은 반응을 관계 회복의 근거로 과대해석하거나, 상대의 태도를 단일한 방향으로 판단하는 위험이 큽니다. 특히, 관계 기반이 약하고 정서적 동요와 충동성 지표가 높게 나타나는 상황에서 사용자의 감정적 충동이 행동으로 이어질 가능성이 있으므로, 지금은 신중한 지연과 보수적 접근이 필수적입니다.</p>
+<p>주요 관찰점은 다음과 같습니다.</p>
+<ul>
+<li>관계 종료 강도가 매우 높아, 현재 상태는 본질적으로 닫힘이 우세한 국면임</li>
+<li>상대방의 개방성 신호가 존재하나, 이는 관계 회복 신호로 단정하기 어려운 부분적 신호임</li>
+<li>정서적 동요와 즉각적 위험 지표가 높아 충동적 판단과 행동 가능성이 있음</li>
+<li>관계 기반이 약해 작은 상호작용에도 감정적 왜곡이 심화될 위험 존재</li>
+</ul>
+<p>이로 인해 지금은 어떤 접촉이나 행동도 관계를 진전시키기보다는 오히려 추가 손실을 초래할 가능성이 높아, 행동 전 충분한 점검과 감정 조절이 필요합니다. 안전 상태는 ‘주의가 필요한 상태’이며, 접촉 운영 모드는 ‘신중한 지연이 필요한 상태’로 분류됩니다.</p>
+<hr />
+<h2>2. 72시간 행동 가이드</h2>
+<p>현재 가장 급한 과제는 충동적인 재접촉 시도와 확인행동을 제한해 추가적인 감정적 손실과 관계 악화를 막는 것입니다.</p>
+<ul>
+<li><strong>오늘 바로 멈출 것</strong></li>
+<li>상대방의 SNS나 메시지 확인 횟수를 하루 3회 이내로 제한한다.</li>
+<li>확인행동(상대 반응 여부 반복 확인, 연락 기록 점검 등)을 즉시 중단한다.</li>
+<li>충동적으로 메시지를 작성하거나 전송하는 행동을 하지 않는다. 충동이 생기면 기록만 하고 즉시 전송하지 않는다.</li>
+<li>
+<p>우회접촉(지인 통한 연락, 갑작스러운 방문 등)을 엄격히 금지한다.</p>
+</li>
+<li>
+<p><strong>3일 안에 회복할 것</strong></p>
+</li>
+<li>감정적 충동이 발생할 때마다 10분 이상 심호흡이나 다른 활동으로 충동 지연 시간을 확보한다.</li>
+<li>연락 충동이 강할 경우, 충동 발생 시점과 감정 상태를 일지에 기록해 패턴을 인지한다.</li>
+<li>주변 신뢰할 수 있는 사람과 감정을 공유하되, 상대 관련 행동을 유도하거나 조언을 구하는 내용은 자제한다.</li>
+</ul>
+<p>이 기간 동안은 ‘행동을 통한 관계 진전’보다 ‘자기 조절과 감정 안정’이 최우선 목표임을 명확히 인지해야 합니다.</p>
+<hr />
+<h2>3. 개인 위험 행동 3가지</h2>
+<p>1) <strong>충동적 재접촉 시도</strong><br />
+- 현재 종료 신호가 매우 강한 상태에서 충동적으로 연락을 시도하면 상대에게 부담을 주거나 거부감을 강화할 수 있습니다.<br />
+- 법적·정서적 손실이 커질 위험이 크며, 관계 회복 가능성 평가 이전에 추가 갈등을 유발할 수 있습니다.<br />
+- 대신, 충동이 일어날 때마다 10분 이상 지연 후 행동 여부를 재검토하는 습관을 들이십시오.</p>
+<p>2) <strong>반복적인 확인행동(스마트폰·SNS 감시)</strong><br />
+- 상대의 반응 여부를 과도하게 확인하면 정서적 불안이 심화되고, 충동적 행동으로 이어질 가능성이 높아집니다.<br />
+- 이로 인해 자신도 모르게 집착적 행동으로 비칠 수 있으며, 상대방과의 관계를 더욱 악화시킬 수 있습니다.<br />
+- 대신, 확인 행동 횟수를 하루 3회 이하로 엄격히 제한하고, 충동 발생 시 기록만 남기고 즉시 행동하지 않는 원칙을 지키십시오.</p>
+<p>3) <strong>우회접촉 및 강압적 행동 시도</strong><br />
+- 직접 연락이 차단되거나 거부된 상황에서 지인이나 다른 경로를 통한 접촉 시도는 법적 문제와 심리적 부담을 가중시킬 수 있습니다.<br />
+- 이러한 행동은 상대의 안전과 개인 권리를 침해할 수 있으며, 관계 회복과는 무관하게 문제만 키울 위험이 큽니다.<br />
+- 대신, 현재는 어떠한 우회접촉도 하지 말고, 관계가 명확히 열릴 때까지 신중한 지연을 유지하십시오.</p>
+<hr />
+<h2>4. 14일 감정 안정화 플랜</h2>
+<h3>1주차: 감정 충동 억제와 확인행동 감소</h3>
+<ul>
+<li>하루 확인행동 횟수를 3회 이하로 제한한다.  </li>
+<li>충동적 연락 욕구가 생길 때마다 10분 이상 지연시킨다.  </li>
+<li>충동 발생 시 감정과 행동 욕구를 일지에 기록해 패턴을 파악한다.</li>
+</ul>
+<h3>2주차: 생활 루틴 회복과 사고 정리</h3>
+<ul>
+<li>일정한 수면과 식사 시간을 유지해 신체 리듬을 안정시킨다.  </li>
+<li>하루 30분 이상 집중할 수 있는 취미나 작업에 시간을 할애해 감정 집중도를 분산시킨다.  </li>
+<li>관계에 대한 생각을 정리하는 시간을 하루 10분 이상 확보하되, 지나친 반복 사고는 피한다.</li>
+</ul>
+<h3>공통 실행 원칙</h3>
+<ul>
+<li>감정이 격해질 때 즉각 행동하지 말고 ‘충동 지연’ 원칙을 반드시 지킨다.  </li>
+<li>주변 신뢰 인물과 감정을 나누되, 상대방 관련 행동을 유도하는 대화는 삼간다.  </li>
+<li>자기 자신을 돌보는 시간을 확보해 정서적 균형을 유지하는 데 집중한다.</li>
+</ul>
+<hr />
+<h2>5. 재접촉 안전 기준</h2>
+<p>현재 상태는 접촉을 신중하게 지연해야 하는 국면입니다. 접촉을 고려하기 전에 반드시 다음 조건을 점검해야 합니다.</p>
+<ul>
+<li>상대방이 명확히 연락 거부 의사를 표현했는가?  </li>
+<li>현재 차단 상태이거나 명시적 거부가 반복되고 있지는 않은가?  </li>
+<li>사용자의 감정 동요와 충동성이 충분히 안정되어 있는가?  </li>
+<li>최근 72시간 내에 충동적 연락 시도가 없었는가?  </li>
+<li>주변의 안전망(신뢰할 수 있는 사람, 전문가 등)과 감정 상태 점검이 완료되었는가?</li>
+</ul>
+<p>이 조건 중 하나라도 충족되지 않으면 접촉 시도는 미루는 것이 맞습니다. 접촉 시도 자체가 관계 회복을 의미하지 않으며, 오히려 추가적인 갈등과 위험을 초래할 수 있음을 반드시 인지해야 합니다.</p>
+<hr />
+<h2>6. 전문가 도움 안내</h2>
+<p>다음과 같은 상황에서는 혼자 감당하기보다 전문가나 상담기관의 도움을 받는 것이 안전합니다.</p>
+<ul>
+<li>감정 조절이 어려워 충동적 행동을 반복하거나 통제하지 못하는 경우  </li>
+<li>불면증, 식욕 부진 또는 과다 섭취 등 신체 리듬이 심각하게 무너진 경우  </li>
+<li>반복적인 확인행동이나 집착적 사고가 일상 기능을 저해하는 경우  </li>
+<li>불안과 우울 증상이 심화되어 일상생활 유지가 어려운 경우  </li>
+<li>주변 사람들과의 관계도 악화되어 사회적 고립 위험이 커진 경우</li>
+</ul>
+<p>특히 위기 징후가 나타날 때는 즉시 안전한 환경을 확보하고, 주변 신뢰 인물 또는 전문 기관에 도움을 요청하는 것이 중요합니다. 혼자 버티려다 상황이 악화되는 것을 예방하는 것이 최우선입니다.</p>
+<hr />
+<ul>
+<li><strong>안전 메모:</strong> 지금은 감정적 충동에 따른 행동이 관계를 더욱 악화시킬 수 있는 시기이므로, 어떠한 접촉 시도도 충분한 시간 지연과 안전 점검 후에만 고려해야 합니다.</li>
+</ul>
+    </main>
+
+    <section class="help-card">
+      <div class="help-title">도움이 더 필요할 때</div>
+      <div class="contact-grid">
+        <div class="contact-card">
+          <div class="contact-num">117</div>
+          <div class="contact-label">스토킹·피해 상담전화</div>
+        </div>
+        <div class="contact-card">
+          <div class="contact-num">1577-0199</div>
+          <div class="contact-label">정신건강 위기상담전화</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      본 리포트는 감정 자극이 아니라 안전 중심의 행동 가이드를 목적으로 제공합니다.
+    </div>
+  </div>
+
+</div>
+<script>
+  function calcHeight() {
+    var docEl = document.documentElement;
+    var body = document.body;
+    if (!docEl || !body) return 0;
+
+    return Math.max(
+      docEl.scrollHeight || 0,
+      docEl.offsetHeight || 0,
+      docEl.clientHeight || 0,
+      body.scrollHeight || 0,
+      body.offsetHeight || 0,
+      body.clientHeight || 0
+    );
+  }
+
+  var lastSentHeight = 0;
+  var lastSentAt = 0;
+  var rafId = 0;
+  function sendHeight(force) {
+    var now = Date.now();
+    var h = calcHeight();
+    if (!h) return;
+    if (!force && (now - lastSentAt) < 120) return;
+    if (!force && Math.abs(h - lastSentHeight) <= 4) return;
+    lastSentHeight = h;
+    lastSentAt = now;
+    window.parent.postMessage({ type: "RCL_REPORT_HEIGHT", height: h }, "*");
+  }
+
+  function requestHeight(force) {
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+    rafId = requestAnimationFrame(function() {
+      rafId = 0;
+      sendHeight(!!force);
+    });
+  }
+
+  function scheduleHeightBursts() {
+    requestHeight(true);
+    setTimeout(function() { requestHeight(true); }, 80);
+    setTimeout(function() { requestHeight(true); }, 200);
+    setTimeout(function() { requestHeight(true); }, 400);
+    setTimeout(function() { requestHeight(true); }, 800);
+    setTimeout(function() { requestHeight(true); }, 1400);
+  }
+
+  document.addEventListener("DOMContentLoaded", function() {
+    scheduleHeightBursts();
+  });
+
+  window.addEventListener("load", function() {
+    window.parent.postMessage({ type: "RCL_PREMIUM_STATE", state: "READY" }, "*");
+    scheduleHeightBursts();
+  });
+
+  window.addEventListener("resize", function() {
+    requestHeight(true);
+  });
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function() {
+      scheduleHeightBursts();
+    }).catch(function() {});
+  }
+
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(function() {
+      requestHeight(false);
+    });
+    ro.observe(document.documentElement);
+    if (document.body) {
+      ro.observe(document.body);
+    }
+  }
+</script>
+</body>
+</html>
