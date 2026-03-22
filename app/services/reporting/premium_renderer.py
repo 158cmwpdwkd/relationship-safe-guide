@@ -554,14 +554,18 @@ def _shell(inner_html: str, *, state: str) -> str:
   }}
 
   var lastSentHeight = 0;
+  var lastMeasuredHeight = 0;
   var lastSentAt = 0;
   var rafId = 0;
+  var resizeTimer = 0;
   function sendHeight(force) {{
     var now = Date.now();
     var h = calcHeight();
     if (!h) return;
-    if (!force && (now - lastSentAt) < 120) return;
-    if (!force && Math.abs(h - lastSentHeight) <= 4) return;
+    if ((now - lastSentAt) < 180) return;
+    if (Math.abs(h - lastSentHeight) <= 8) return;
+    if (!force && Math.abs(h - lastMeasuredHeight) <= 8) return;
+    lastMeasuredHeight = h;
     lastSentHeight = h;
     lastSentAt = now;
     window.parent.postMessage({{ type: "RCL_REPORT_HEIGHT", height: h }}, "*");
@@ -579,11 +583,9 @@ def _shell(inner_html: str, *, state: str) -> str:
 
   function scheduleHeightBursts() {{
     requestHeight(true);
-    setTimeout(function() {{ requestHeight(true); }}, 80);
-    setTimeout(function() {{ requestHeight(true); }}, 200);
-    setTimeout(function() {{ requestHeight(true); }}, 400);
-    setTimeout(function() {{ requestHeight(true); }}, 800);
-    setTimeout(function() {{ requestHeight(true); }}, 1400);
+    setTimeout(function() {{ requestHeight(true); }}, 160);
+    setTimeout(function() {{ requestHeight(true); }}, 420);
+    setTimeout(function() {{ requestHeight(true); }}, 1000);
   }}
 
   document.addEventListener("DOMContentLoaded", function() {{
@@ -607,7 +609,13 @@ def _shell(inner_html: str, *, state: str) -> str:
 
   if (window.ResizeObserver) {{
     var ro = new ResizeObserver(function() {{
-      requestHeight(false);
+      if (resizeTimer) {{
+        clearTimeout(resizeTimer);
+      }}
+      resizeTimer = setTimeout(function() {{
+        resizeTimer = 0;
+        requestHeight(false);
+      }}, 140);
     }});
     ro.observe(document.documentElement);
     if (document.body) {{
