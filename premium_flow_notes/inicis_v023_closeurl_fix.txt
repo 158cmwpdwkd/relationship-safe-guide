@@ -1,0 +1,39 @@
+1. V023의 직접 원인
+- 결제 요청 페이지는 `relationship-safe-guide-api.onrender.com/pay/start?...` 에서 열리는데,
+  `closeUrl` 을 `https://reconnectlab.co.kr/payment-fail...` 로 직접 넣어 same-origin 규칙을 깨뜨렸다.
+- 이니시스는 `closeUrl` 도메인이 요청 페이지 도메인과 같아야 하므로 V023 가 발생했다.
+
+2. 왜 closeUrl 직접 payment-fail 연결이 안 되는지
+- `closeUrl` 은 결제 호출 단계의 파라미터라서, 결제창을 연 문서와 동일 도메인이어야 한다.
+- 외부 도메인 이동은 `closeUrl` 자체가 아니라, same-origin close/exit endpoint 응답 이후에만 수행해야 한다.
+
+3. 롤백한 항목
+- `build_inicis_form()` 의 `closeUrl` 직접 `payment-fail` 연결 제거
+
+4. same-origin closeUrl 최종 경로
+- `https://relationship-safe-guide-api.onrender.com/api/payments/inicis/close?...`
+- 필요 query:
+  - `free_return_url`
+  - `free_token`
+
+5. close endpoint 이후 external redirect 구조
+- `/pay/start`
+- `closeUrl` -> onrender same-origin `/api/payments/inicis/close`
+- `/api/payments/inicis/close`
+  - 내부적으로 `RedirectResponse(303)` 로 `https://reconnectlab.co.kr/payment-fail?...` 이동
+- 즉 요청 단계는 same-origin, 외부 이동은 endpoint 응답 단계에서만 수행된다.
+
+6. 수정한 파일 목록
+- app/routes_payments.py
+
+7. 테스트 시나리오
+- `/pay/start` 진입
+- 이니시스 결제창 정상 오픈 확인
+- 결제 취소
+- close endpoint 호출 확인
+- `payment-fail` 이동 여부 확인
+- 로그 확인:
+  - `pay.start.close_url_built`
+  - `pay.start.close_url_origin`
+  - `pay.start.request_origin`
+  - `pay.close.redirect_target`

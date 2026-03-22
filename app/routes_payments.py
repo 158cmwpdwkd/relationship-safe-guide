@@ -252,11 +252,7 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
         "buyeremail": buyer_email,
         "buyertel": buyer_tel,
         "returnUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/return",
-        "closeUrl": build_payment_fail_target(
-            mode="cancel",
-            free_return_url=(free_return_url or "").strip(),
-            free_token=(free_token or "").strip(),
-        ),
+        "closeUrl": f"{PAYMENT_BASE_URL}/api/payments/inicis/close" + (f"?{close_query}" if close_query else ""),
         "charset": "UTF-8",
         "format": "JSON",
         "payViewType": "overlay",
@@ -349,7 +345,8 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
             current_url: window.location.href
           }});
 
-          var paymentFailUrl = "{build_payment_fail_target(mode='cancel', free_return_url=free_return_url, free_token=free_token)}";
+var paymentFailUrl = "{build_payment_fail_target(mode='cancel', free_return_url=free_return_url, free_token=free_token)}";
+          var closeUrl = "{f'{PAYMENT_BASE_URL}/api/payments/inicis/close' + (f'?{build_payment_fail_query(free_return_url=(free_return_url or '').strip(), free_token=(free_token or '').strip())}' if build_payment_fail_query(free_return_url=(free_return_url or '').strip(), free_token=(free_token or '').strip()) else '')}";
           var payStarted = false;
           var redirecting = false;
           var sawBlur = false;
@@ -357,6 +354,7 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
           function redirectPaymentFail(reason) {{
             if (redirecting) return;
             redirecting = true;
+            console.debug("[RCL payment]", "pay.close.redirect_target", paymentFailUrl);
             console.debug("[RCL payment]", "pay.start.redirect_payment_fail", {{ reason: reason }});
             console.debug("[RCL payment]", "pay.start.redirect_target", paymentFailUrl);
             window.location.replace(paymentFailUrl);
@@ -371,7 +369,14 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
             }}
           }});
           console.debug("[RCL payment]", "payment.free_dom.cleanup", {{ removed: removed }});
-          console.debug("[RCL payment]", "pay.start.boot", {{ current_url: window.location.href, close_url: "{build_payment_fail_target(mode='cancel', free_return_url=free_return_url, free_token=free_token)}" }});
+          console.debug("[RCL payment]", "pay.start.boot", {{ current_url: window.location.href, close_url: closeUrl }});
+          console.debug("[RCL payment]", "pay.start.request_origin", window.location.origin);
+          console.debug("[RCL payment]", "pay.start.close_url_built", closeUrl);
+          try {{
+            console.debug("[RCL payment]", "pay.start.close_url_origin", new URL(closeUrl, window.location.href).origin);
+          }} catch (e) {{
+            console.debug("[RCL payment]", "pay.start.close_url_origin", "INVALID");
+          }}
 
           if (window.self !== window.top) {{
             console.debug("[RCL payment]", "payment.fail.redirect.mode", "embedded_context_escape");
