@@ -684,6 +684,11 @@
       } catch (e) {}
     }
 
+    function isMobileBrowser() {
+      const ua = (navigator.userAgent || "").toLowerCase();
+      return /iphone|ipad|ipod|android|mobile|windows phone|iemobile|blackberry/.test(ua);
+    }
+
     function buildCanonicalFreeReturnUrl(rawUrl, freeToken) {
       debugLog("free.return_url.capture", {
         rawUrl: rawUrl || "",
@@ -1065,6 +1070,7 @@
           freeToken: reportToken ? (reportToken.slice(0, 4) + "..." + reportToken.slice(-4)) : ""
         });
         url.searchParams.set("report_token", reportToken);
+        url.searchParams.set("device_hint", isMobileBrowser() ? "mobile" : "pc");
         if (normalizedReturnUrl) {
           url.searchParams.set("free_return_url", normalizedReturnUrl);
           debugLog("free.premium_cta.attach_free_return_url", { url: normalizedReturnUrl });
@@ -1076,6 +1082,11 @@
         debugLog("free.premium_cta.href", { href: url.toString() });
 
         const payUrl = url.toString();
+        if (isMobileBrowser()) {
+          debugLog("free.payment.open_target", { target: "_self", href: payUrl, mobile: true });
+          window.location.href = payUrl;
+          return;
+        }
         const opened = window.open(payUrl, "_blank", "noopener,noreferrer");
         if (opened && !opened.closed) {
           debugLog("free.payment.open_new_window", { opened: true });

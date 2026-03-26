@@ -4,9 +4,10 @@ import json
 import time
 import uuid
 import hashlib
+import base64
 import traceback
 from datetime import datetime
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, quote, parse_qsl
 from typing import Optional
 
 import httpx
@@ -25,6 +26,7 @@ SERVICE_BASE_URL = (os.getenv("SERVICE_BASE_URL") or "https://reconnectlab.co.kr
 API_BASE_URL = (os.getenv("API_BASE_URL") or "https://relationship-safe-guide-api.onrender.com").strip().rstrip("/")
 PAYMENT_BASE_URL = (os.getenv("PAYMENT_BASE_URL") or API_BASE_URL).rstrip("/")
 PAYMENT_FAIL_URL = f"{SERVICE_BASE_URL}/payment-fail"
+MOBILE_PAYMENT_URL = "https://mobile.inicis.com/smart/payment/"
 
 PREMIUM_PRICE = int(os.getenv("PREMIUM_PRICE") or "29000")
 PREMIUM_GOODNAME = (os.getenv("PREMIUM_GOODNAME") or "리커넥트랩 프리미엄 AI 리포트").strip()
@@ -37,6 +39,7 @@ class PreparePaymentIn(BaseModel):
     buyerTel: Optional[str] = "010-0000-0000"
     freeReturnUrl: Optional[str] = None
     freeToken: Optional[str] = None
+    deviceHint: Optional[str] = None
 
 
 def build_payment_fail_query(*, free_return_url: str = "", free_token: str = "", code: str = "", msg: str = "", mode: str = "") -> str:
@@ -72,12 +75,46 @@ def log_payment_return(event: str, **payload) -> None:
         print(f"{event} {payload}")
 
 
+def log_payment_mobile(event: str, **payload) -> None:
+    try:
+        print(f"{event} {json.dumps(payload, ensure_ascii=False, default=str)}")
+    except Exception:
+        print(f"{event} {payload}")
+
+
 def build_payment_success_target(*, order_id: str) -> str:
     return f"{SERVICE_BASE_URL}/premium-survey?orderId={quote((order_id or '').strip())}"
 
 
 def build_payment_home_target(*, reason: str) -> str:
     return f"{SERVICE_BASE_URL}/?payment_reason={quote((reason or '').strip())}"
+
+
+def is_mobile_user_agent(user_agent: str | None) -> bool:
+    ua = (user_agent or "").lower()
+    return any(
+        token in ua
+        for token in [
+            "iphone",
+            "ipad",
+            "ipod",
+            "android",
+            "mobile",
+            "windows phone",
+            "blackberry",
+            "iemobile",
+        ]
+    )
+
+
+def resolve_mobile_detected(*, request: Request | None, device_hint: str = "") -> bool:
+    hint = (device_hint or "").strip().lower()
+    if hint in {"mobile", "m", "1", "true", "yes"}:
+        return True
+    if hint in {"pc", "desktop", "0", "false", "no"}:
+        return False
+    user_agent = request.headers.get("user-agent") if request else ""
+    return is_mobile_user_agent(user_agent)
 
 
 def _render_client_return_page(*, mode: str, code: str = "", msg: str = "", free_return_url: str = "", free_token: str = "") -> RedirectResponse:
@@ -117,6 +154,95 @@ def make_auth_signature(auth_token: str, timestamp: str) -> str:
 
 def make_auth_verification(auth_token: str, sign_key: str, timestamp: str) -> str:
     return sha256_hex(f"authToken={auth_token}&signKey={sign_key}&timestamp={timestamp}")
+
+
+def make_mobile_hash(oid: str, price: int, timestamp: str, sign_key: str) -> str:
+    digest = hashlib.sha512(f"{oid}{price}{timestamp}{sign_key}".encode("utf-8")).digest()
+    return base64.b64encode(digest).decode("ascii")
+
+
+def create_pending_order(
+    *,
+    report_token: str,
+    buyer_name: str,
+    buyer_email: str,
+    buyer_tel: str,
+    free_return_url: str = "",
+    free_token: str = "",
+) -> dict:
+    normalized_report_token = (report_token or "").strip()
+    if not normalized_report_token:
+        raise HTTPException(status_code=400, detail="reportToken is required")
+
+    if not INICIS_MID or not INICIS_SIGN_KEY:
+        raise HTTPException(status_code=500, detail="INICIS_MID / INICIS_SIGN_KEY is missing")
+
+    rep, sid = find_report_and_sid_by_token(normalized_report_token)
+    if not rep or not sid:
+        raise HTTPException(status_code=404, detail="invalid report token")
+
+    oid = make_order_id()
+    timestamp = str(int(time.time() * 1000))
+    prepared_payload = {
+        "stage": "prepare",
+        "report_token": normalized_report_token,
+        "buyerName": buyer_name,
+        "buyerEmail": buyer_email,
+        "buyerTel": buyer_tel,
+        "free_return_url": (free_return_url or "").strip(),
+        "free_token": (free_token or "").strip(),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+    db = SessionLocal()
+    try:
+        order = Order(
+            order_id=oid,
+            sid=sid,
+            free_report_token=normalized_report_token,
+            status="PENDING",
+            payment_method=None,
+            amount=PREMIUM_PRICE,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            pg_payload_json=json.dumps(prepared_payload, ensure_ascii=False),
+        )
+        db.add(order)
+        db.commit()
+    finally:
+        db.close()
+
+    return {
+        "order_id": oid,
+        "sid": sid,
+        "timestamp": timestamp,
+        "prepared_payload": prepared_payload,
+    }
+
+
+def parse_mobile_approve_response(raw_text: str) -> dict:
+    text = (raw_text or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+
+    pairs: list[tuple[str, str]] = []
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    for chunk in normalized.split("\n"):
+        piece = chunk.strip()
+        if not piece:
+            continue
+        if "=" in piece and "&" not in piece:
+            key, value = piece.split("=", 1)
+            pairs.append((key.strip(), value.strip()))
+            continue
+        pairs.extend(parse_qsl(piece, keep_blank_values=True))
+    return {key: value for key, value in pairs if key}
 
 
 def is_valid_inicis_auth_url(auth_url: str, idc_name: Optional[str]) -> bool:
@@ -283,6 +409,47 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
         "offerPeriod": datetime.utcnow().strftime("%Y%m%d-%Y%m%d"),
         "gopaymethod": "",
         "acceptmethod": "centerCd(Y)",
+    }
+    return form
+
+
+def build_mobile_payment_form(
+    report_token: str,
+    buyer_name: str,
+    buyer_email: str,
+    buyer_tel: str,
+    free_return_url: str = "",
+    free_token: str = "",
+):
+    context = create_pending_order(
+        report_token=report_token,
+        buyer_name=buyer_name,
+        buyer_email=buyer_email,
+        buyer_tel=buyer_tel,
+        free_return_url=free_return_url,
+        free_token=free_token,
+    )
+    order_id = context["order_id"]
+    timestamp = context["timestamp"]
+    mobile_hash = make_mobile_hash(order_id, PREMIUM_PRICE, timestamp, INICIS_SIGN_KEY)
+
+    form = {
+        "P_MID": INICIS_MID,
+        "P_OID": order_id,
+        "P_AMT": str(PREMIUM_PRICE),
+        "P_GOODS": PREMIUM_GOODNAME,
+        "P_UNAME": buyer_name,
+        "P_MOBILE": buyer_tel,
+        "P_EMAIL": buyer_email,
+        "P_NEXT_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/next",
+        "P_RETURN_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/return",
+        "P_CANCEL_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/cancel",
+        "P_CHARSET": "utf8",
+        "P_INI_PAYMENT": "CARD",
+        "P_NOTI": order_id,
+        "P_RESERVED": "centerCd=Y&amt_hash=Y&nextUrl=POST",
+        "P_TIMESTAMP": timestamp,
+        "P_CHKFAKE": mobile_hash,
     }
     return form
 
@@ -454,15 +621,128 @@ if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
     return HTMLResponse(content=html)
 
 
+def render_mobile_inicis_html(form: dict, *, free_return_url: str = "", free_token: str = "") -> HTMLResponse:
+    inputs = []
+    for key, value in form.items():
+        if value is None:
+            continue
+        safe_key = str(key).replace('"', "&quot;")
+        safe_val = str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+        inputs.append(f'<input type="hidden" name="{safe_key}" value="{safe_val}" />')
+
+    html = f"""
+    <!doctype html>
+    <html lang="ko">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>ReconnectLab Mobile Payment</title>
+      <style>
+        body {{
+          font-family: Arial, sans-serif;
+          background: #0F1626;
+          color: #F0ECE8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          margin: 0;
+          padding: 24px;
+        }}
+        .box {{
+          width: 100%;
+          max-width: 420px;
+          background: #1A2540;
+          border: 1px solid rgba(212,145,108,.2);
+          border-radius: 16px;
+          padding: 28px 24px;
+          text-align: center;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="box">모바일 결제창으로 이동 중입니다.</div>
+      <form id="inicisMobilePayForm" method="POST" action="{MOBILE_PAYMENT_URL}" accept-charset="UTF-8" style="display:none;">
+        {''.join(inputs)}
+      </form>
+      <script>
+        window.addEventListener("load", function () {{
+          console.debug("[RCL payment]", "payment.mobile.page.enter", {{
+            current_url: window.location.href,
+            action: "{MOBILE_PAYMENT_URL}"
+          }});
+          document.getElementById("inicisMobilePayForm").submit();
+        }});
+      </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+def build_mobile_cancel_target(*, free_return_url: str = "", free_token: str = "", code: str = "", msg: str = "", mode: str = "cancel") -> str:
+    return f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?{build_payment_fail_query(mode=mode, code=code, msg=msg, free_return_url=free_return_url, free_token=free_token)}"
+
+
+def build_mobile_success_target(*, order_id: str) -> str:
+    return build_payment_success_target(order_id=order_id)
+
+
+async def approve_mobile_payment(*, req_url: str, tid: str, mid: str) -> dict:
+    payload = {
+        "P_TID": (tid or "").strip(),
+        "P_MID": (mid or INICIS_MID).strip(),
+    }
+    log_payment_mobile(
+        "payment.mobile.approve.request",
+        order_id="",
+        req_url=req_url,
+        tid=tid,
+    )
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(
+            req_url,
+            data=payload,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        resp.raise_for_status()
+        return parse_mobile_approve_response(resp.text)
+
+
 @router.get("/pay/start", response_class=HTMLResponse)
 async def pay_start_page(
+    request: Request,
     report_token: str = Query(...),
     buyer_name: str = Query("고객"),
     buyer_email: str = Query("help@reconnectlab.co.kr"),
     buyer_tel: str = Query("010-0000-0000"),
     free_return_url: str = Query(""),
     free_token: str = Query(""),
+    device_hint: str = Query(""),
 ):
+    mobile_detected = resolve_mobile_detected(request=request, device_hint=device_hint)
+    if mobile_detected:
+        form = build_mobile_payment_form(
+            report_token=report_token,
+            buyer_name=buyer_name or "고객",
+            buyer_email=buyer_email or "help@reconnectlab.co.kr",
+            buyer_tel=buyer_tel or "010-0000-0000",
+            free_return_url=free_return_url or "",
+            free_token=free_token or "",
+        )
+        log_payment_mobile(
+            "payment.mobile.prepare",
+            order_id=form.get("P_OID"),
+            mobile_detected=True,
+            payment_url=MOBILE_PAYMENT_URL,
+            selected_method=form.get("P_INI_PAYMENT"),
+        )
+        return render_mobile_inicis_html(
+            form,
+            free_return_url=free_return_url or "",
+            free_token=free_token or "",
+        )
+
     form = build_inicis_form(
         report_token=report_token,
         buyer_name=buyer_name or "고객",
@@ -479,18 +759,38 @@ async def pay_start_page(
 
 
 @router.post("/api/payments/inicis/prepare")
-async def inicis_prepare(payload: PreparePaymentIn):
-    form = build_inicis_form(
-        report_token=payload.reportToken.strip(),
-        buyer_name=payload.buyerName or "고객",
-        buyer_email=payload.buyerEmail or "help@reconnectlab.co.kr",
-        buyer_tel=payload.buyerTel or "010-0000-0000",
-        free_return_url=payload.freeReturnUrl or "",
-        free_token=payload.freeToken or "",
-    )
+async def inicis_prepare(payload: PreparePaymentIn, request: Request):
+    mobile_detected = resolve_mobile_detected(request=request, device_hint=payload.deviceHint or "")
+    if mobile_detected:
+        form = build_mobile_payment_form(
+            report_token=payload.reportToken.strip(),
+            buyer_name=payload.buyerName or "고객",
+            buyer_email=payload.buyerEmail or "help@reconnectlab.co.kr",
+            buyer_tel=payload.buyerTel or "010-0000-0000",
+            free_return_url=payload.freeReturnUrl or "",
+            free_token=payload.freeToken or "",
+        )
+        log_payment_mobile(
+            "payment.mobile.prepare",
+            order_id=form.get("P_OID"),
+            mobile_detected=True,
+            payment_url=MOBILE_PAYMENT_URL,
+            selected_method=form.get("P_INI_PAYMENT"),
+        )
+    else:
+        form = build_inicis_form(
+            report_token=payload.reportToken.strip(),
+            buyer_name=payload.buyerName or "고객",
+            buyer_email=payload.buyerEmail or "help@reconnectlab.co.kr",
+            buyer_tel=payload.buyerTel or "010-0000-0000",
+            free_return_url=payload.freeReturnUrl or "",
+            free_token=payload.freeToken or "",
+        )
 
     return {
         "ok": True,
+        "mobile_detected": mobile_detected,
+        "payment_url": MOBILE_PAYMENT_URL if mobile_detected else "https://stdpay.inicis.com/stdjs/INIStdPay.js",
         "form": form,
     }
 
@@ -546,6 +846,280 @@ async def inicis_exit(
         free_return_url=free_return_url or "",
         free_token=free_token or "",
     )
+
+
+@router.api_route("/api/payments/inicis/mobile/next", methods=["GET", "POST"])
+async def inicis_mobile_next(request: Request):
+    payload = await request.form() if request.method == "POST" else request.query_params
+    p_oid = (payload.get("P_OID") or payload.get("P_NOTI") or "").strip()
+    p_status = (payload.get("P_STATUS") or "").strip()
+    p_tid = (payload.get("P_TID") or "").strip()
+    p_req_url = (payload.get("P_REQ_URL") or "").strip()
+    p_rmesg1 = (payload.get("P_RMESG1") or "").strip()
+    p_mid = (payload.get("P_MID") or "").strip()
+    p_amt = (payload.get("P_AMT") or "").strip()
+    p_type = (payload.get("P_TYPE") or "").strip()
+
+    log_payment_mobile(
+        "payment.mobile.next.enter",
+        order_id=p_oid,
+        p_status=p_status,
+        p_tid=p_tid,
+        p_req_url=p_req_url,
+        p_rmesg1=p_rmesg1,
+    )
+
+    if not p_oid:
+        log_payment_mobile(
+            "payment.mobile.redirect_target",
+            final_url=build_payment_home_target(reason="ORDER_ID_MISSING"),
+            reason="ORDER_ID_MISSING",
+        )
+        return RedirectResponse(url=build_payment_home_target(reason="ORDER_ID_MISSING"), status_code=303)
+
+    db = SessionLocal()
+    try:
+        order = db.query(Order).filter(Order.order_id == p_oid).first()
+        if not order:
+            log_payment_mobile(
+                "payment.mobile.redirect_target",
+                final_url=build_payment_home_target(reason="ORDER_NOT_FOUND"),
+                reason="ORDER_NOT_FOUND",
+                order_id=p_oid,
+            )
+            return RedirectResponse(url=build_payment_home_target(reason="ORDER_NOT_FOUND"), status_code=303)
+
+        try:
+            prepared_payload = json.loads(order.pg_payload_json or "{}")
+        except Exception:
+            prepared_payload = {}
+        free_return_url, free_token = get_free_return_context(prepared_payload)
+
+        if p_status not in {"00", "0000"}:
+            target = build_mobile_cancel_target(
+                free_return_url=free_return_url,
+                free_token=free_token,
+                code=p_status or "MOBILE_AUTH_FAIL",
+                msg=p_rmesg1,
+                mode="fail",
+            )
+            log_payment_mobile(
+                "payment.mobile.redirect_target",
+                final_url=target,
+                reason="MOBILE_AUTH_FAIL",
+                order_id=order.order_id,
+            )
+            return RedirectResponse(url=target, status_code=303)
+
+        if not p_req_url or not p_tid:
+            target = build_mobile_cancel_target(
+                free_return_url=free_return_url,
+                free_token=free_token,
+                code="MOBILE_REQ_URL_MISSING",
+                mode="fail",
+            )
+            log_payment_mobile(
+                "payment.mobile.redirect_target",
+                final_url=target,
+                reason="MOBILE_REQ_URL_MISSING",
+                order_id=order.order_id,
+            )
+            return RedirectResponse(url=target, status_code=303)
+
+        log_payment_mobile(
+            "payment.mobile.approve.request",
+            order_id=order.order_id,
+            req_url=p_req_url,
+            tid=p_tid,
+        )
+        approve_data = await approve_mobile_payment(req_url=p_req_url, tid=p_tid, mid=p_mid or INICIS_MID)
+        approve_status = (
+            str(approve_data.get("P_STATUS") or approve_data.get("resultCode") or "")
+            .strip()
+            .upper()
+        )
+        approve_message = str(approve_data.get("P_RMESG1") or approve_data.get("resultMsg") or "").strip()
+        approve_method = str(
+            approve_data.get("P_TYPE")
+            or approve_data.get("payMethod")
+            or p_type
+            or "CARD"
+        ).strip().upper()
+
+        log_payment_mobile(
+            "payment.mobile.approve.result",
+            order_id=order.order_id,
+            success=approve_status in {"00", "0000"},
+            status=approve_status,
+            code=approve_status,
+            message=approve_message,
+        )
+
+        if approve_status not in {"00", "0000"}:
+            order.status = "FAILED"
+            order.updated_at = datetime.utcnow()
+            order.pg_payload_json = json.dumps(
+                {
+                    "stage": "mobile_approve_failed",
+                    "prepared_payload": prepared_payload,
+                    "mobile_next_payload": dict(payload),
+                    "mobile_approve_result": approve_data,
+                },
+                ensure_ascii=False,
+            )
+            db.commit()
+            target = build_mobile_cancel_target(
+                free_return_url=free_return_url,
+                free_token=free_token,
+                code=approve_status or "MOBILE_APPROVE_FAIL",
+                msg=approve_message,
+                mode="fail",
+            )
+            log_payment_mobile(
+                "payment.mobile.redirect_target",
+                final_url=target,
+                reason="MOBILE_APPROVE_FAIL",
+                order_id=order.order_id,
+            )
+            return RedirectResponse(url=target, status_code=303)
+
+        if is_vbank_pay_method(approve_method):
+            order.status = "VBANK_ISSUED"
+            order.payment_method = approve_method
+            if p_amt:
+                try:
+                    order.amount = int(p_amt)
+                except Exception:
+                    pass
+            order.updated_at = datetime.utcnow()
+            order.pg_payload_json = json.dumps(
+                {
+                    "stage": "mobile_vbank_issued",
+                    "prepared_payload": prepared_payload,
+                    "mobile_next_payload": dict(payload),
+                    "mobile_approve_result": approve_data,
+                },
+                ensure_ascii=False,
+            )
+            db.commit()
+            target = f"{SERVICE_BASE_URL}/payment-pending?orderId={quote(order.order_id)}"
+            log_payment_mobile(
+                "payment.mobile.redirect_target",
+                final_url=target,
+                reason="PAYMENT_PENDING",
+                order_id=order.order_id,
+            )
+            return RedirectResponse(url=target, status_code=303)
+
+        order.status = "PAID"
+        order.payment_method = approve_method or "CARD"
+        if p_amt:
+            try:
+                order.amount = int(p_amt)
+            except Exception:
+                pass
+        order.paid_at = datetime.utcnow()
+        order.updated_at = datetime.utcnow()
+        order.pg_payload_json = json.dumps(
+            {
+                "stage": "mobile_paid",
+                "prepared_payload": prepared_payload,
+                "mobile_next_payload": dict(payload),
+                "mobile_approve_result": approve_data,
+            },
+            ensure_ascii=False,
+        )
+        db.commit()
+
+        target = build_mobile_success_target(order_id=order.order_id)
+        log_payment_mobile(
+            "payment.mobile.redirect_target",
+            final_url=target,
+            reason="PAYMENT_CONFIRMED",
+            order_id=order.order_id,
+        )
+        return RedirectResponse(url=target, status_code=303)
+    except Exception as exc:
+        log_payment_mobile(
+            "payment.mobile.redirect_target",
+            final_url=build_payment_home_target(reason=f"EXCEPTION_{exc.__class__.__name__.upper()}"),
+            reason=f"EXCEPTION_{exc.__class__.__name__.upper()}",
+            order_id=p_oid,
+        )
+        raise
+    finally:
+        db.close()
+
+
+@router.api_route("/api/payments/inicis/mobile/return", methods=["GET", "POST"])
+async def inicis_mobile_return(request: Request):
+    payload = await request.form() if request.method == "POST" else request.query_params
+    p_oid = (payload.get("P_OID") or payload.get("P_NOTI") or "").strip()
+    if not p_oid:
+        target = build_payment_home_target(reason="ORDER_ID_MISSING")
+        log_payment_mobile("payment.mobile.redirect_target", final_url=target, reason="ORDER_ID_MISSING")
+        return RedirectResponse(url=target, status_code=303)
+
+    db = SessionLocal()
+    try:
+        order = db.query(Order).filter(Order.order_id == p_oid).first()
+        if order and order.status == "PAID":
+            target = build_mobile_success_target(order_id=order.order_id)
+            log_payment_mobile("payment.mobile.redirect_target", final_url=target, reason="RETURN_ALREADY_PAID", order_id=order.order_id)
+            return RedirectResponse(url=target, status_code=303)
+
+        free_return_url = ""
+        free_token = ""
+        if order:
+            try:
+                prepared_payload = json.loads(order.pg_payload_json or "{}")
+            except Exception:
+                prepared_payload = {}
+            free_return_url, free_token = get_free_return_context(prepared_payload)
+        target = build_mobile_cancel_target(
+            free_return_url=free_return_url,
+            free_token=free_token,
+            code="MOBILE_RETURN_PENDING",
+            mode="fail",
+        )
+        log_payment_mobile("payment.mobile.redirect_target", final_url=target, reason="MOBILE_RETURN_PENDING", order_id=p_oid)
+        return RedirectResponse(url=target, status_code=303)
+    finally:
+        db.close()
+
+
+@router.api_route("/api/payments/inicis/mobile/cancel", methods=["GET", "POST"])
+async def inicis_mobile_cancel(request: Request):
+    payload = await request.form() if request.method == "POST" else request.query_params
+    p_oid = (payload.get("P_OID") or payload.get("P_NOTI") or "").strip()
+
+    free_return_url = ""
+    free_token = ""
+    if p_oid:
+        db = SessionLocal()
+        try:
+            order = db.query(Order).filter(Order.order_id == p_oid).first()
+            if order:
+                try:
+                    prepared_payload = json.loads(order.pg_payload_json or "{}")
+                except Exception:
+                    prepared_payload = {}
+                free_return_url, free_token = get_free_return_context(prepared_payload)
+        finally:
+            db.close()
+
+    target = build_mobile_cancel_target(
+        free_return_url=free_return_url,
+        free_token=free_token,
+        code="MOBILE_CANCEL",
+    )
+    log_payment_mobile(
+        "payment.mobile.redirect_target",
+        final_url=target,
+        reason="MOBILE_CANCEL",
+        order_id=p_oid,
+    )
+    return RedirectResponse(url=target, status_code=303)
 
 
 @router.post("/api/payments/inicis/return")

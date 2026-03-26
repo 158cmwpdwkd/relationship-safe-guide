@@ -1,0 +1,120 @@
+1. 수정한 파일 목록
+- app/routes_payments.py
+- imweb/imweb free-report.html
+
+2. 수정한 함수 목록
+- app/routes_payments.py
+  - log_payment_mobile()
+  - is_mobile_user_agent()
+  - resolve_mobile_detected()
+  - make_mobile_hash()
+  - create_pending_order()
+  - parse_mobile_approve_response()
+  - build_mobile_payment_form()
+  - render_mobile_inicis_html()
+  - build_mobile_cancel_target()
+  - build_mobile_success_target()
+  - approve_mobile_payment()
+  - pay_start_page()
+  - inicis_prepare()
+  - inicis_mobile_next()
+  - inicis_mobile_return()
+  - inicis_mobile_cancel()
+- imweb/imweb free-report.html
+  - isMobileBrowser()
+  - goPremiumPay()
+
+3. 현재 구조에서 모바일이 깨지던 직접 원인
+- 기존 결제 진입은 PC 웹표준 `INIStdPay` overlay 전용 구조였다.
+- `pay/start`가 항상 PC용 form과 `stdpay.inicis.com/stdjs/INIStdPay.js`를 전제로 했다.
+- 모바일 전용 `mobile.inicis.com/smart/payment/` 요청 파라미터가 없었다.
+- `P_NEXT_URL -> P_REQ_URL` 2트랜잭션 최종 승인 처리도 없었다.
+- free report 프론트는 결제 버튼 클릭 시 항상 `window.open(..., "_blank")`를 사용해 모바일 브라우저에서 자연스럽지 않았다.
+
+4. 모바일/PC 분기 방식
+- 서버:
+  - `resolve_mobile_detected()`가 `device_hint` 우선, 없으면 `User-Agent`로 모바일 여부를 판정한다.
+- 프론트:
+  - `imweb free-report.html`에서 `isMobileBrowser()`로 모바일 여부를 판단한다.
+  - 결제 URL에 `device_hint=mobile|pc`를 붙인다.
+  - 모바일이면 현재 창(`window.location.href`)으로 이동한다.
+  - PC면 기존처럼 새 창(`window.open`)을 유지한다.
+
+5. 모바일 결제 요청 파라미터 요약
+- 모바일 결제 요청 URL
+  - `https://mobile.inicis.com/smart/payment/`
+- 현재 설정한 주요 필드
+  - `P_MID`
+  - `P_OID`
+  - `P_AMT`
+  - `P_GOODS`
+  - `P_UNAME`
+  - `P_MOBILE`
+  - `P_EMAIL`
+  - `P_NEXT_URL`
+  - `P_RETURN_URL`
+  - `P_CANCEL_URL`
+  - `P_CHARSET`
+  - `P_INI_PAYMENT=CARD`
+  - `P_NOTI`
+  - `P_RESERVED=centerCd=Y&amt_hash=Y&nextUrl=POST`
+  - `P_TIMESTAMP`
+  - `P_CHKFAKE`
+
+6. 모바일 승인 처리 방식
+- `P_NEXT_URL` = `/api/payments/inicis/mobile/next`
+- `mobile/next`에서 수신:
+  - `P_OID`
+  - `P_STATUS`
+  - `P_TID`
+  - `P_REQ_URL`
+  - `P_RMESG1`
+- 인증 성공(`P_STATUS=00/0000`)일 때만 서버가 `P_REQ_URL`로 승인 요청을 보낸다.
+- 승인 응답을 파싱해서:
+  - 카드류면 `Order.status = PAID`
+  - 가상계좌면 `Order.status = VBANK_ISSUED`
+- 최종 승인 성공 후에만 `/premium-survey?orderId=<order_id>`로 보낸다.
+
+7. 성공/취소/실패 redirect 규칙
+- 모바일 카드 승인 성공
+  - `/premium-survey?orderId=<order_id>`
+- 모바일 가상계좌 채번
+  - `/payment-pending?orderId=<order_id>`
+- 모바일 인증 실패 / 승인 실패 / 승인 URL 누락
+  - `/payment-fail?...mode=fail...`
+- 모바일 사용자 취소
+  - `/payment-fail?...mode=cancel...`
+- order_id 복원 실패 / order 없음
+  - 홈 fallback 전 `payment.mobile.redirect_target` 로그에 reason을 남긴 뒤 홈 이동
+
+8. 테스트 시나리오별 결과
+- 모바일 카드 성공
+  - 코드 경로상 `pay/start -> mobile.inicis.com -> /mobile/next -> P_REQ_URL 승인 -> premium-survey?orderId=...`가 연결되도록 구현했다.
+  - 실제 휴대폰/실결제 검증은 아직 필요하다.
+- 모바일 결제 취소
+  - `/api/payments/inicis/mobile/cancel` 또는 `mobile/next` 비정상 상태에서 `payment-fail`로 보낸다.
+  - free return context는 기존 저장값을 재사용한다.
+- 잘못된 callback
+  - `ORDER_ID_MISSING`, `ORDER_NOT_FOUND`, `MOBILE_REQ_URL_MISSING` 등이 로그에 남는다.
+- 기존 PC 결제 회귀
+  - `device_hint=pc` 또는 비모바일 UA에서는 기존 `INIStdPay` 흐름을 유지한다.
+- 같은 free report에서 모바일 취소 후 재결제
+  - order는 기존과 동일하게 결제 진입 시마다 새로 생성된다.
+  - source of truth는 계속 `order_id`다.
+
+9. 남은 리스크
+- 실제 KG이니시스 모바일 계약/상점 설정에 따라 `P_RESERVED`, `P_CHARSET`, 승인 응답 포맷 세부값이 달라질 수 있다.
+- 현재 승인 응답 파서는 JSON, querystring, line-based key=value를 모두 받도록 했지만, 실운영 응답 포맷으로 추가 검증이 필요하다.
+- 로컬 Python 실행기가 깨져 있어 `py_compile`/pytest 자동 검증을 돌리지 못했다.
+- 모바일 앱카드, ISP, 외부앱 전환 복귀 UX는 1차 범위 밖이다.
+
+10. 다음 라운드 권장 작업
+- 실휴대폰 카드 결제로 `payment.mobile.next.enter -> approve.request -> approve.result -> redirect_target` 로그를 실제 수집할 것
+- 모바일 승인 응답 원문을 기준으로 파서 키(`P_STATUS`, `resultCode`, `P_TYPE`)를 확정할 것
+- 모바일 cancel/return 페이지 사용자 문구를 다듬고, 취소된 order 상태 관리 정책을 정리할 것
+- 카드 외 수단 노출 제어가 필요하면 계약/상점 설정과 함께 `P_INI_PAYMENT` 정책을 더 세밀하게 조정할 것
+
+- 결론: 모바일에서는 PC 웹표준 결제 흐름을 그대로 쓸 수 없어서, 모바일 전용 요청 URL과 `P_NEXT_URL -> P_REQ_URL` 승인 단계를 별도로 붙였다. 현재 구조상 모바일 카드 1회 성공 후 `premium-survey?orderId=...`로 이어질 수 있는 최소 완성본이다.
+- 직접 원인: 기존 결제 진입과 서버 콜백이 PC `INIStdPay` 기준으로만 구현되어 모바일 전용 파라미터와 2트랜잭션 승인 처리 자체가 없었던 점.
+- 보조 원인: free report 프론트가 모바일에서도 popup/new window 기반으로 결제를 열던 점.
+- 가장 먼저 실제 휴대폰에서 테스트할 URL/버튼: free report 페이지의 `??9,000원으로 프리미엄 받기` 버튼
