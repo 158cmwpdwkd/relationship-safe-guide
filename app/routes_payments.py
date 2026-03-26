@@ -490,7 +490,7 @@ def build_mobile_payment_form(
         "P_NEXT_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/next",
         "P_RETURN_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/return",
         "P_CANCEL_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/cancel",
-        "P_CHARSET": "UTF-8",
+        "P_CHARSET": "utf8",
         "P_INI_PAYMENT": "CARD",
         "P_NOTI": order_id,
         "P_RESERVED": reserved_value,
@@ -509,6 +509,13 @@ def _render_hidden_inputs(form: dict) -> str:
         safe_val = html.escape(str(value), quote=True)
         inputs.append(f'<input type="hidden" name="{safe_key}" value="{safe_val}" />')
     return "".join(inputs)
+
+
+def _preview_text(value: str, *, limit: int = 24) -> str:
+    text = (value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "..."
 
 
 def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str = "") -> HTMLResponse:
@@ -806,6 +813,15 @@ async def pay_start_page(
                 "P_RESERVED": form.get("P_RESERVED"),
             },
         )
+        log_payment_mobile(
+            "payment.mobile.charset.prepare",
+            order_id=form.get("P_OID"),
+            p_charset=form.get("P_CHARSET"),
+            goods_preview=_preview_text(str(form.get("P_GOODS") or "")),
+            uname_preview=_preview_text(str(form.get("P_UNAME") or "")),
+            html_charset="UTF-8",
+            form_accept_charset="UTF-8",
+        )
         return render_mobile_inicis_html(
             form,
             free_return_url=free_return_url or "",
@@ -863,6 +879,15 @@ async def inicis_prepare(payload: PreparePaymentIn, request: Request):
                 "P_INI_PAYMENT": form.get("P_INI_PAYMENT"),
                 "P_RESERVED": form.get("P_RESERVED"),
             },
+        )
+        log_payment_mobile(
+            "payment.mobile.charset.prepare",
+            order_id=form.get("P_OID"),
+            p_charset=form.get("P_CHARSET"),
+            goods_preview=_preview_text(str(form.get("P_GOODS") or "")),
+            uname_preview=_preview_text(str(form.get("P_UNAME") or "")),
+            html_charset="UTF-8",
+            form_accept_charset="UTF-8",
         )
     else:
         form = build_inicis_form(

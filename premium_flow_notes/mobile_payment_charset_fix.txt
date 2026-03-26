@@ -1,0 +1,54 @@
+1. 수정한 파일 목록
+- `app/routes_payments.py`
+
+2. 수정한 함수 목록
+- `build_mobile_payment_form()`
+- `_preview_text()` 신규 추가
+- `/pay/start` 모바일 prepare 분기
+- `/api/payments/inicis/prepare` 모바일 prepare 분기
+
+3. 직접 원인
+- 모바일 결제 요청 파라미터의 `P_CHARSET` 값이 `UTF-8`로 내려가고 있었다.
+- KG이니시스 모바일 결제 Q&A 기준은 `P_CHARSET=utf8`이다.
+- HTML/form 쪽은 이미 UTF-8 방향이었지만, PG 파라미터 charset 표기가 공식 기준과 어긋나 모바일 결제창에서 한글 해석이 틀어질 수 있는 상태였다.
+
+4. 최종 적용한 P_CHARSET 값
+- `utf8`
+
+5. HTML charset / form accept-charset 적용 여부
+- 모바일 결제 HTML에 `<meta charset="utf-8">` 존재
+- 모바일 결제 HTML에 `<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />` 존재
+- 모바일 form에 `accept-charset="UTF-8"` 존재
+- 모바일 HTML 응답은 `text/html; charset=UTF-8`로 내려가도록 유지
+
+6. 한글 필드 생성 로직 변경 여부
+- `P_GOODS`는 `PREMIUM_GOODNAME` 원문 문자열 그대로 사용
+- `P_UNAME`는 `buyer_name` 원문 문자열 그대로 사용
+- `.encode()/.decode()/urlencode()` 같은 추가 변환은 넣지 않았다
+- hidden input 값은 HTML escaping만 적용하는 기존 방식 유지 방향이며, 모바일 charset 작업에서는 별도 인코딩 변환을 추가하지 않았다
+
+7. 추가 로그 항목
+- `payment.mobile.charset.prepare`
+  - `order_id`
+  - `p_charset`
+  - `goods_preview`
+  - `uname_preview`
+  - `html_charset`
+  - `form_accept_charset`
+
+8. 테스트 결과
+- 코드 기준 점검 결과:
+  - 모바일 prepare 시 `P_CHARSET`은 이제 `utf8`으로 고정된다
+  - 모바일 HTML 응답은 UTF-8 charset 헤더/메타/form accept-charset을 유지한다
+  - 승인(next/approve), 해시키, 리다이렉트 흐름은 수정하지 않았다
+- 실제 결제창 표시는 이 환경에서 실기 테스트하지 못했다
+
+9. 남은 리스크
+- `PREMIUM_GOODNAME` 또는 `buyer_name` 원문 자체가 깨진 문자열로 들어오면 결제창에서도 그대로 보인다
+- 모바일 브라우저/이니시스 쪽 캐시 영향이 있으면 즉시 반영 확인이 늦을 수 있다
+- PC 쪽 HTML도 UTF-8 응답으로 유지되지만, 이번 수정의 타깃은 모바일이고 PC 결제 로직 자체는 건드리지 않았다
+
+- 결론:
+- 직접 원인: 모바일 KG이니시스 요청 파라미터의 `P_CHARSET` 값이 공식 기준인 `utf8`으로 고정되어 있지 않았다.
+- 보조 원인: 브라우저 응답 charset, form submit charset, PG 파라미터 charset을 함께 확인할 수 있는 로그가 없어 실제 전송 축을 검증하기 어려웠다.
+- 다음 모바일 테스트에서 가장 먼저 확인할 문구: 모바일 결제창 상단의 상품명 `리커넥트랩 프리미엄 AI 리포트`
