@@ -6,6 +6,7 @@ import uuid
 import hashlib
 import base64
 import traceback
+import html
 from datetime import datetime
 from urllib.parse import urlparse, quote, parse_qsl
 from typing import Optional
@@ -489,7 +490,7 @@ def build_mobile_payment_form(
         "P_NEXT_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/next",
         "P_RETURN_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/return",
         "P_CANCEL_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/cancel",
-        "P_CHARSET": "utf8",
+        "P_CHARSET": "UTF-8",
         "P_INI_PAYMENT": "CARD",
         "P_NOTI": order_id,
         "P_RESERVED": reserved_value,
@@ -499,20 +500,26 @@ def build_mobile_payment_form(
     return form
 
 
-def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str = "") -> HTMLResponse:
-    inputs = []
+def _render_hidden_inputs(form: dict) -> str:
+    inputs: list[str] = []
     for key, value in form.items():
         if value is None:
             continue
-        safe_key = str(key).replace('"', "&quot;")
-        safe_val = str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+        safe_key = html.escape(str(key), quote=True)
+        safe_val = html.escape(str(value), quote=True)
         inputs.append(f'<input type="hidden" name="{safe_key}" value="{safe_val}" />')
+    return "".join(inputs)
+
+
+def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str = "") -> HTMLResponse:
+    inputs_html = _render_hidden_inputs(form)
 
     html = f"""
     <!doctype html>
     <html lang="ko">
     <head>
       <meta charset="utf-8" />
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>리커넥트랩 결제 진행</title>
       <script src="https://stdpay.inicis.com/stdjs/INIStdPay.js" charset="UTF-8"></script>
@@ -569,7 +576,7 @@ def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str
       </div>
 
       <form id="inicisPayForm" method="POST" accept-charset="UTF-8" style="display:none;">
-        {''.join(inputs)}
+        {inputs_html}
       </form>
 
       <script>
@@ -663,23 +670,18 @@ if (!window.INIStdPay || typeof window.INIStdPay.pay !== "function") {{
     </body>
     </html>
     """
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=html, media_type="text/html; charset=UTF-8")
 
 
 def render_mobile_inicis_html(form: dict, *, free_return_url: str = "", free_token: str = "") -> HTMLResponse:
-    inputs = []
-    for key, value in form.items():
-        if value is None:
-            continue
-        safe_key = str(key).replace('"', "&quot;")
-        safe_val = str(value).replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-        inputs.append(f'<input type="hidden" name="{safe_key}" value="{safe_val}" />')
+    inputs_html = _render_hidden_inputs(form)
 
     html = f"""
     <!doctype html>
     <html lang="ko">
     <head>
       <meta charset="utf-8" />
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>ReconnectLab Mobile Payment</title>
       <style>
@@ -708,7 +710,7 @@ def render_mobile_inicis_html(form: dict, *, free_return_url: str = "", free_tok
     <body>
       <div class="box">모바일 결제창으로 이동 중입니다.</div>
       <form id="inicisMobilePayForm" method="POST" action="{MOBILE_PAYMENT_URL}" accept-charset="UTF-8" style="display:none;">
-        {''.join(inputs)}
+        {inputs_html}
       </form>
       <script>
         window.addEventListener("load", function () {{
@@ -722,7 +724,7 @@ def render_mobile_inicis_html(form: dict, *, free_return_url: str = "", free_tok
     </body>
     </html>
     """
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=html, media_type="text/html; charset=UTF-8")
 
 
 def build_mobile_cancel_target(*, free_return_url: str = "", free_token: str = "", code: str = "", msg: str = "", mode: str = "cancel", stage: str = "", order_id: str = "") -> str:

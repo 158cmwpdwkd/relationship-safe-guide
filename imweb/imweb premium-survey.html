@@ -407,6 +407,7 @@
               </svg>
             </button>
           </div>
+          <p id="rl-wait-note" class="rl-wait-note" style="display:none;">프리미엄 리포트를 생성 중입니다. 10~30초 정도 소요될 수 있어요.</p>
         </div>
 
       </div>
@@ -965,6 +966,13 @@
   padding-top: 18px;
   border-top: 1px solid rgba(255,255,255,0.06);
 }
+#rl-paid .rl-wait-note {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sub2);
+  text-align: center;
+}
 #rl-paid .rl-btn {
   flex: 1;
   min-height: 52px;
@@ -1171,6 +1179,7 @@
   const prevBtn = document.getElementById("rl-prev");
   const nextBtn = document.getElementById("rl-next");
   const msgEl = document.getElementById("paid-msg");
+  const waitNoteEl = document.getElementById("rl-wait-note");
   const progressBar = document.getElementById("rl-progress-bar");
   const stepText = document.getElementById("rl-step-text");
 
@@ -1440,6 +1449,8 @@
       '<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg> 분석 중…';
 
     setMsg("");
+    nextBtn.textContent = "리포트 생성 중...";
+    if (waitNoteEl) waitNoteEl.style.display = "block";
 
     try {
       const res = await fetch(PAID_ENDPOINT, {
@@ -1481,6 +1492,7 @@
       setMsg(err.message || "제출 중 오류가 발생했습니다.");
       nextBtn.disabled = false;
       nextBtn.classList.remove("loading");
+      if (waitNoteEl) waitNoteEl.style.display = "none";
       setNextLabel(currentStep);
     }
   }
