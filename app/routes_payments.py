@@ -22,6 +22,7 @@ router = APIRouter(tags=["payments"])
 
 INICIS_MID = (os.getenv("INICIS_MID") or "").strip()
 INICIS_SIGN_KEY = (os.getenv("INICIS_SIGN_KEY") or "").strip()
+INICIS_MOBILE_HASH_KEY = (os.getenv("INICIS_MOBILE_HASH_KEY") or "").strip()
 SERVICE_BASE_URL = (os.getenv("SERVICE_BASE_URL") or "https://reconnectlab.co.kr").strip().rstrip("/")
 API_BASE_URL = (os.getenv("API_BASE_URL") or "https://relationship-safe-guide-api.onrender.com").strip().rstrip("/")
 PAYMENT_BASE_URL = (os.getenv("PAYMENT_BASE_URL") or API_BASE_URL).rstrip("/")
@@ -176,8 +177,9 @@ def make_auth_verification(auth_token: str, sign_key: str, timestamp: str) -> st
     return sha256_hex(f"authToken={auth_token}&signKey={sign_key}&timestamp={timestamp}")
 
 
-def make_mobile_hash(oid: str, price: int, timestamp: str, sign_key: str) -> str:
-    digest = hashlib.sha512(f"{oid}{price}{timestamp}{sign_key}".encode("utf-8")).digest()
+def make_mobile_hash(*, amount: str, order_id: str, timestamp: str, mobile_hash_key: str) -> str:
+    raw = f"{(amount or '').strip()}{(order_id or '').strip()}{(timestamp or '').strip()}{(mobile_hash_key or '').strip()}"
+    digest = hashlib.sha512(raw.encode("utf-8")).digest()
     return base64.b64encode(digest).decode("ascii")
 
 
@@ -441,6 +443,14 @@ def build_mobile_payment_form(
     free_return_url: str = "",
     free_token: str = "",
 ):
+    if not INICIS_MOBILE_HASH_KEY:
+        log_payment_mobile_fail(
+            reason="MOBILE_HASH_KEY_MISSING",
+            summary="mobile hash key env is missing at prepare stage",
+            stage="prepare",
+        )
+        raise HTTPException(status_code=500, detail="MOBILE_HASH_KEY_MISSING")
+
     context = create_pending_order(
         report_token=report_token,
         buyer_name=buyer_name,
@@ -451,12 +461,27 @@ def build_mobile_payment_form(
     )
     order_id = context["order_id"]
     timestamp = context["timestamp"]
-    mobile_hash = make_mobile_hash(order_id, PREMIUM_PRICE, timestamp, INICIS_SIGN_KEY)
+    amount = str(PREMIUM_PRICE)
+    mobile_hash = make_mobile_hash(
+        amount=amount,
+        order_id=order_id,
+        timestamp=timestamp,
+        mobile_hash_key=INICIS_MOBILE_HASH_KEY,
+    )
+    reserved_value = "centerCd=Y&amt_hash=Y&nextUrl=POST"
+
+    log_payment_mobile(
+        "payment.mobile.hash.ready",
+        order_id=order_id,
+        amount=amount,
+        timestamp=timestamp,
+        chkfake_length=len(mobile_hash),
+    )
 
     form = {
         "P_MID": INICIS_MID,
         "P_OID": order_id,
-        "P_AMT": str(PREMIUM_PRICE),
+        "P_AMT": amount,
         "P_GOODS": PREMIUM_GOODNAME,
         "P_UNAME": buyer_name,
         "P_MOBILE": buyer_tel,
@@ -467,7 +492,7 @@ def build_mobile_payment_form(
         "P_CHARSET": "utf8",
         "P_INI_PAYMENT": "CARD",
         "P_NOTI": order_id,
-        "P_RESERVED": "centerCd=Y&amt_hash=Y&nextUrl=POST",
+        "P_RESERVED": reserved_value,
         "P_TIMESTAMP": timestamp,
         "P_CHKFAKE": mobile_hash,
     }
@@ -760,6 +785,12 @@ async def pay_start_page(
             mobile_detected=True,
             payment_url=MOBILE_PAYMENT_URL,
             selected_method=form.get("P_INI_PAYMENT"),
+            final_reserved=form.get("P_RESERVED"),
+            has_timestamp=bool(form.get("P_TIMESTAMP")),
+            has_chkfake=bool(form.get("P_CHKFAKE")),
+            timestamp_value_length=len(str(form.get("P_TIMESTAMP") or "")),
+            hash_enabled=bool(INICIS_MOBILE_HASH_KEY),
+            hash_mode_enabled=True,
             full_post_field_keys=sorted(form.keys()),
             field_summary={
                 "P_MID": form.get("P_MID"),
@@ -812,6 +843,12 @@ async def inicis_prepare(payload: PreparePaymentIn, request: Request):
             mobile_detected=True,
             payment_url=MOBILE_PAYMENT_URL,
             selected_method=form.get("P_INI_PAYMENT"),
+            final_reserved=form.get("P_RESERVED"),
+            has_timestamp=bool(form.get("P_TIMESTAMP")),
+            has_chkfake=bool(form.get("P_CHKFAKE")),
+            timestamp_value_length=len(str(form.get("P_TIMESTAMP") or "")),
+            hash_enabled=bool(INICIS_MOBILE_HASH_KEY),
+            hash_mode_enabled=True,
             full_post_field_keys=sorted(form.keys()),
             field_summary={
                 "P_MID": form.get("P_MID"),

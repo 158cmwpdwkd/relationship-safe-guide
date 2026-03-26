@@ -1,0 +1,77 @@
+1. 수정한 파일 목록
+- app/routes_payments.py
+
+2. 수정한 함수 목록
+- make_mobile_hash()
+- build_mobile_payment_form()
+- pay_start_page()
+- inicis_prepare()
+
+3. 모바일 Hash Key 적용 방식
+- 모바일 금액위변조 Hash Key를 PC sign key와 분리해서 별도 env로 읽도록 변경했다.
+- 모바일 결제 요청 시 `amt_hash=Y`를 유지하면서:
+  - `P_TIMESTAMP`
+  - `P_CHKFAKE`
+  를 함께 세팅한다.
+- `P_CHKFAKE`는 이제 `INICIS_MOBILE_HASH_KEY` 기준으로만 생성한다.
+
+4. 새 env 이름
+- `INICIS_MOBILE_HASH_KEY`
+
+5. P_CHKFAKE 계산 규칙
+- 입력값
+  - `P_AMT`
+  - `P_OID`
+  - `P_TIMESTAMP`
+  - `INICIS_MOBILE_HASH_KEY`
+- 연결 순서
+  - `amount + order_id + timestamp + mobile_hash_key`
+- 해시
+  - `SHA-512`
+- 출력
+  - 해시 바이트를 `BASE64` 인코딩한 문자열
+- 중요
+  - 기존처럼 `INICIS_SIGN_KEY`를 쓰지 않음
+  - 기존처럼 `order_id + amount + timestamp + key` 순서도 아님
+
+6. 수정 후 P_RESERVED 값
+- `centerCd=Y&amt_hash=Y&nextUrl=POST`
+
+7. 로그에 추가한 검증 포인트
+- `payment.mobile.prepare`
+  - `final_reserved`
+  - `has_timestamp`
+  - `has_chkfake`
+  - `timestamp_value_length`
+  - `hash_enabled`
+  - `hash_mode_enabled`
+- `payment.mobile.hash.ready`
+  - `order_id`
+  - `amount`
+  - `timestamp`
+  - `chkfake_length`
+- 보안상 실제 hash 원문과 실제 key 값은 로그에 남기지 않음
+
+8. 다음 모바일 테스트 때 확인할 값
+- `payment.mobile.prepare`
+  - `final_reserved`에 `amt_hash=Y` 포함 여부
+  - `has_timestamp = true`
+  - `has_chkfake = true`
+  - `timestamp_value_length`가 일반적인 밀리초 길이인지
+  - `hash_enabled = true`
+- `payment.mobile.hash.ready`
+  - `chkfake_length`가 비정상적으로 0이 아닌지
+- mobile.inicis.com 진입 후
+  - 이전의 "해시 키가 설정되어 있지 않습니다" 류 오류가 즉시 사라졌는지
+- 이후 실패가 남으면
+  - 기존 `reason/stage/orderId` 기반으로 다음 단계 원인 추적
+
+9. 남은 리스크
+- 실제 관리자 페이지의 모바일 Hash Key 값이 서버 env에 정확히 들어가 있어야 한다.
+- 운영 환경에서 env가 누락되면 이제 prepare 단계에서 `MOBILE_HASH_KEY_MISSING`으로 즉시 실패한다.
+- 현재는 코드와 로그 기준 정합성까지 맞춘 상태이며, 최종 검증은 실휴대폰 결제가 필요하다.
+
+- 결론: 모바일 `P_CHKFAKE`를 웹 sign key가 아니라 전용 `INICIS_MOBILE_HASH_KEY`와 공식 결합 순서로 다시 계산하도록 수정했다.
+- 직접 원인: 모바일 금액위변조 hash 계산에 잘못된 key와 잘못된 문자열 결합 순서를 사용하던 점.
+- 보조 원인: `amt_hash=Y`를 켠 상태에서 hash 활성 여부와 timestamp/chkfake 존재 여부를 별도로 검증하는 로그가 부족했던 점.
+- 다음 모바일 테스트에서 가장 먼저 볼 값: `payment.mobile.prepare`의 `hash_enabled=true`, `has_timestamp=true`, `has_chkfake=true`
