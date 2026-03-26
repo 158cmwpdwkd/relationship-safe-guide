@@ -1126,11 +1126,15 @@
 (function () {
   const API_BASE = "https://relationship-safe-guide-api.onrender.com";
   const ACCESS_CHECK_ENDPOINT = API_BASE + "/api/premium/access-check";
-  const PAID_ENDPOINT = API_BASE + "/api/survey/paid";
+  const PAID_ENDPOINT = API_BASE + "/api/premium/survey/submit";
+  const GENERATE_ENDPOINT = API_BASE + "/api/premium/report/generate";
   const TOTAL_STEPS = 20;
+  const FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
+  const ACTIVE_ORDER_ID_STORAGE_KEY = "rl_active_order_id";
+  const PREMIUM_REPORT_TOKEN_STORAGE_KEY = "rl_premium_report_token";
 
   let currentStep = 1;
-  let REPORT_TOKEN = "";
+  let FREE_REPORT_TOKEN = "";
   let ORDER_ID = "";
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -1173,21 +1177,28 @@
   const q7OtherInput = document.getElementById("rl-q7-other-input");
   const q7OtherCount = document.getElementById("rl-q7-other-count");
 
-  function getReportToken() {
-    const queryToken = urlParams.get("token");
-    if (queryToken) return queryToken;
+  function readStorage(key) {
+    try {
+      return localStorage.getItem(key) || "";
+    } catch (e) {
+      return "";
+    }
+  }
 
-    const pathMatch = window.location.pathname.match(/\/r\/([^/?#]+)/);
-    if (pathMatch && pathMatch[1]) return pathMatch[1];
-
-    const storageToken = localStorage.getItem("rl_report_token");
-    if (storageToken) return storageToken;
-
-    return "";
+  function writeStorage(key, value) {
+    try {
+      if (!value) return;
+      localStorage.setItem(key, value);
+    } catch (e) {}
   }
 
   function getOrderId() {
-    return urlParams.get("orderId") || "";
+    return (
+      urlParams.get("orderId") ||
+      urlParams.get("order_id") ||
+      readStorage(ACTIVE_ORDER_ID_STORAGE_KEY) ||
+      ""
+    );
   }
 
   function goHome() {
@@ -1196,7 +1207,6 @@
 
   function goPending() {
     const qs = new URLSearchParams();
-    if (REPORT_TOKEN) qs.set("token", REPORT_TOKEN);
     if (ORDER_ID) qs.set("orderId", ORDER_ID);
     window.location.href = "https://reconnectlab.co.kr/payment-pending" + (qs.toString() ? ("?" + qs.toString()) : "");
   }
@@ -1372,18 +1382,42 @@
     return "";
   }
 
+  function buildSurveyAnswers() {
+    return {
+      q1: answers.PAID_Q1_duration,
+      q2: answers.PAID_Q2_relationship_weight,
+      q3: answers.PAID_Q3_reunion_history,
+      q4: answers.PAID_Q4_breakup_timing,
+      q5: answers.PAID_Q5_last_contact_timing,
+      q6: answers.PAID_Q6_breakup_initiator,
+      q7: answers.PAID_Q7_breakup_reason,
+      q7_text: answers.PAID_Q7_breakup_reason_other_text || null,
+      q8: answers.PAID_Q8_issue_severity,
+      q9: answers.PAID_Q9_last_conversation_mood,
+      q10: answers.PAID_Q10_conflict_pattern,
+      q11: answers.PAID_Q11_partner_conflict_response,
+      q12: answers.PAID_Q12_my_problem_behavior,
+      q13: answers.PAID_Q13_channel_state,
+      q14: answers.PAID_Q14_recent_signal,
+      q15: answers.PAID_Q15_contact_after_reject,
+      q16: answers.PAID_Q16_response_after_contact,
+      q17: answers.PAID_Q17_regret_freq,
+      q18: answers.PAID_Q18_impulse_action.slice(),
+      q19: answers.PAID_Q19_changes_2w.slice(),
+      q20: answers.PAID_Q20_goal
+    };
+  }
+
   async function submitSurvey() {
-    if (!REPORT_TOKEN) {
-      setMsg("리포트 연결 정보가 없습니다. 무료리포트 페이지에서 다시 진입해 주세요.");
+    if (!ORDER_ID) {
+      setMsg("주문 정보를 찾을 수 없어요. 처음부터 다시 진행해주세요.");
       return;
     }
 
     const payload = {
       schema_version: "paid_survey_v2_20q",
-      stage: "paid",
-      report_token: REPORT_TOKEN,
       order_id: ORDER_ID,
-      answers: Object.assign({}, answers)
+      answers: buildSurveyAnswers()
     };
 
     nextBtn.disabled = true;
@@ -1415,13 +1449,28 @@
         throw new Error(data.detail || data.message || "유료설문 저장에 실패했습니다.");
       }
 
-      setMsg("유료설문이 저장되었습니다.", true);
+      if (data.free_report_token) {
+        FREE_REPORT_TOKEN = data.free_report_token;
+        writeStorage(FREE_REPORT_TOKEN_STORAGE_KEY, FREE_REPORT_TOKEN);
+      }
 
-      if (data.redirect_url) { window.location.href = data.redirect_url; return; }
-      if (data.report_token) { window.location.href = API_BASE + "/r/" + data.report_token; return; }
-      if (data.next_url) { window.location.href = data.next_url; return; }
+      const generateRes = await fetch(GENERATE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: ORDER_ID, overwrite: false })
+      });
+      const generateData = await generateRes.json().catch(function () { return {}; });
 
-      nextBtn.textContent = "제출 완료";
+      if (!generateRes.ok) {
+        throw new Error(generateData.detail || generateData.message || "프리미엄 리포트 생성에 실패했습니다.");
+      }
+
+      if (!generateData.premium_report_token) {
+        throw new Error("프리미엄 리포트 연결 정보를 받지 못했습니다.");
+      }
+
+      writeStorage(PREMIUM_REPORT_TOKEN_STORAGE_KEY, generateData.premium_report_token);
+      window.location.href = API_BASE + "/r/" + encodeURIComponent(generateData.premium_report_token);
 
     } catch (err) {
       setMsg(err.message || "제출 중 오류가 발생했습니다.");
@@ -1475,17 +1524,16 @@
   }
 
   async function checkAccess() {
-    REPORT_TOKEN = getReportToken();
     ORDER_ID = getOrderId();
+    writeStorage(ACTIVE_ORDER_ID_STORAGE_KEY, ORDER_ID);
 
-    if (!REPORT_TOKEN || !ORDER_ID) {
+    if (!ORDER_ID) {
       goHome();
       return false;
     }
 
     try {
       const qs = new URLSearchParams({
-        token: REPORT_TOKEN,
         orderId: ORDER_ID
       });
 
@@ -1501,6 +1549,17 @@
       const data = await res.json();
 
       if (data && data.ok === true) {
+        if (data.free_report_token) {
+          FREE_REPORT_TOKEN = data.free_report_token;
+          writeStorage(FREE_REPORT_TOKEN_STORAGE_KEY, FREE_REPORT_TOKEN);
+        }
+        if (data.premium_report_token) {
+          writeStorage(PREMIUM_REPORT_TOKEN_STORAGE_KEY, data.premium_report_token);
+        }
+        if (data.state === "READY" && data.premium_report_token) {
+          window.location.replace(API_BASE + "/r/" + encodeURIComponent(data.premium_report_token));
+          return false;
+        }
         return true;
       }
 

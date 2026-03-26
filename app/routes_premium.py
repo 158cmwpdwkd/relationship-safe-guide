@@ -14,10 +14,9 @@ from .schemas import (
 from .services.interpretation.schemas import PaidSurveyRequest
 from .services.premium_report import (
     build_entry_response,
-    prepare_premium_preview_or_raise,
     resolve_premium_state,
     run_premium_pipeline,
-    submit_paid_survey_and_run_pipeline,
+    submit_paid_survey,
 )
 
 router = APIRouter(prefix="/api/premium", tags=["premium"])
@@ -31,16 +30,10 @@ def get_db():
         db.close()
 
 
-def _raise_for_blocking_state(*, report_token: str, order_id: str, db: Session):
-    state = resolve_premium_state(
-        report_token=report_token,
-        order_id=order_id,
-        db=db,
-    )
-    if state.state == "INVALID_REPORT_TOKEN":
-        raise HTTPException(status_code=404, detail="INVALID_REPORT_TOKEN")
-    if state.state == "REPORT_ORDER_MISMATCH":
-        raise HTTPException(status_code=400, detail="REPORT_ORDER_MISMATCH")
+def _raise_for_blocking_state(*, order_id: str, db: Session):
+    state = resolve_premium_state(order_id=order_id, db=db)
+    if state.state == "ORDER_NOT_FOUND":
+        raise HTTPException(status_code=404, detail="ORDER_NOT_FOUND")
     if state.state == "NOT_PAID":
         raise HTTPException(status_code=403, detail="NOT_PAID")
     return state
@@ -48,45 +41,39 @@ def _raise_for_blocking_state(*, report_token: str, order_id: str, db: Session):
 
 @router.get("/entry", response_model=PremiumEntryOut)
 def premium_entry(
-    token: str = Query(...),
-    order_id: str | None = Query(default=None),
+    orderId: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    return build_entry_response(
-        report_token=token,
-        order_id=order_id,
-        db=db,
-    )
+    return build_entry_response(order_id=orderId, db=db)
 
 
 @router.get("/access-check")
 def premium_access_check(
-    token: str = Query(...),
     orderId: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    state = resolve_premium_state(
-        report_token=token,
-        order_id=orderId,
-        db=db,
-    )
-    if state.state == "INVALID_REPORT_TOKEN":
-        return {"ok": False, "reason": "INVALID_REPORT_TOKEN"}
-    if state.state == "REPORT_ORDER_MISMATCH":
-        return {"ok": False, "reason": "SID_MISMATCH"}
+    state = resolve_premium_state(order_id=orderId, db=db)
+    if state.state == "ORDER_NOT_FOUND":
+        return {"ok": False, "reason": "ORDER_NOT_FOUND"}
     if state.state == "NOT_PAID":
         return {"ok": False, "reason": "NOT_PAID"}
-    return {"ok": True}
+    return {
+        "ok": True,
+        "state": state.state,
+        "order_id": state.order_id,
+        "free_report_token": state.free_report_token,
+        "premium_report_token": state.premium_report_token,
+        "report_url": state.report_url,
+    }
 
 
 @router.post("/survey/paid", response_model=SurveySubmitOut)
 @router.post("/survey/submit", response_model=SurveySubmitOut)
-def submit_paid_survey(
+def submit_paid_survey_route(
     payload: PaidSurveyRequest,
     db: Session = Depends(get_db),
 ):
-    return submit_paid_survey_and_run_pipeline(
-        report_token=payload.report_token,
+    return submit_paid_survey(
         order_id=payload.order_id,
         answers=payload.answers,
         submitted_at=payload.submitted_at,
@@ -95,35 +82,33 @@ def submit_paid_survey(
 
 
 @router.post("/report/generate", response_model=PremiumReportGenerateOut)
-def generate_premium_report_payload(
+def generate_premium_report(
     payload: PremiumReportGenerateIn,
     db: Session = Depends(get_db),
 ):
-    _raise_for_blocking_state(
-        report_token=payload.report_token,
+    _raise_for_blocking_state(order_id=payload.order_id, db=db)
+    premium_report, state, preview, reused_existing = run_premium_pipeline(
         order_id=payload.order_id,
         db=db,
-    )
-
-    _, _, _, result = prepare_premium_preview_or_raise(
-        report_token=payload.report_token,
-        order_id=payload.order_id,
-        db=db,
-    )
-
-    state = resolve_premium_state(
-        report_token=payload.report_token,
-        order_id=payload.order_id,
-        db=db,
+        overwrite=payload.overwrite,
     )
 
     return PremiumReportGenerateOut(
         ok=True,
-        sid=state.sid,
-        prompt=result["prompt"],
-        interpretation_result=result["interpretation_result"],
-        metrics=result["metrics"],
-        meta=result["meta"],
+        sid=state.sid or "",
+        order_id=payload.order_id,
+        premium_report_token=premium_report.premium_report_token,
+        report_url=f"/r/{premium_report.premium_report_token}",
+        status=premium_report.status,
+        reused_existing=reused_existing,
+        prompt=preview["prompt"],
+        interpretation_result=preview["interpretation_result"],
+        metrics=preview["metrics"],
+        meta={
+            **preview["meta"],
+            "report_url": f"/r/{premium_report.premium_report_token}",
+            **({"reused_existing": True} if reused_existing else {}),
+        },
     )
 
 
@@ -132,46 +117,28 @@ def finalize_premium_report(
     payload: PremiumReportFinalizeIn,
     db: Session = Depends(get_db),
 ):
-    _raise_for_blocking_state(
-        report_token=payload.report_token,
-        order_id=payload.order_id,
-        db=db,
-    )
-
-    report, _, _, preview = prepare_premium_preview_or_raise(
-        report_token=payload.report_token,
-        order_id=payload.order_id,
-        db=db,
-    )
-    reused_existing = (
-        not payload.overwrite
-        and report.status == "READY"
-        and bool((report.html or "").strip())
-        and bool((report.markdown or "").strip())
-    )
-
-    final_state = run_premium_pipeline(
-        report_token=payload.report_token,
+    _raise_for_blocking_state(order_id=payload.order_id, db=db)
+    premium_report, state, preview, reused_existing = run_premium_pipeline(
         order_id=payload.order_id,
         db=db,
         overwrite=payload.overwrite,
     )
-    db.refresh(report)
 
     return PremiumReportFinalizeOut(
         ok=True,
-        sid=final_state.sid,
-        report_token=payload.report_token,
-        saved=not reused_existing and final_state.state == "READY",
-        status=report.status,
+        sid=state.sid or "",
+        order_id=payload.order_id,
+        premium_report_token=premium_report.premium_report_token,
+        saved=not reused_existing and premium_report.status == "READY",
+        status=premium_report.status,
         prompt=preview["prompt"],
         interpretation_result=preview["interpretation_result"],
         metrics=preview["metrics"],
-        markdown=report.markdown,
-        html=report.html,
+        markdown=premium_report.markdown,
+        html=premium_report.html,
         meta={
             **preview["meta"],
-            "report_url": f"/r/{payload.report_token}",
+            "report_url": f"/r/{premium_report.premium_report_token}",
             **({"reused_existing": True} if reused_existing else {}),
         },
     )
@@ -179,26 +146,17 @@ def finalize_premium_report(
 
 @router.get("/report/status", response_model=PremiumReportStatusOut)
 def get_premium_report_status(
-    sid: str = Query(...),
     order_id: str = Query(...),
-    report_token: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    state = _raise_for_blocking_state(
-        report_token=report_token,
-        order_id=order_id,
-        db=db,
-    )
-
-    if state.sid != sid:
-        raise HTTPException(status_code=400, detail="SID_MISMATCH")
-
+    state = _raise_for_blocking_state(order_id=order_id, db=db)
     return PremiumReportStatusOut(
         ok=True,
-        sid=state.sid,
-        report_token=report_token,
+        sid=state.sid or "",
+        order_id=order_id,
+        premium_report_token=state.premium_report_token,
         status=state.state,
         has_html=state.has_report_html,
         has_markdown=state.has_report_markdown,
-        report_url=f"/r/{report_token}",
+        report_url=state.report_url,
     )

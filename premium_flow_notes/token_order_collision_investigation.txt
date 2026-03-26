@@ -1,0 +1,366 @@
+1. 검토한 파일 목록
+- app/models.py
+- app/db.py
+- app/main.py
+- app/routes_survey.py
+- app/routes_payments.py
+- app/routes_premium.py
+- app/routes_report.py
+- app/schemas.py
+- app/services/premium_report.py
+- app/services/reporting/premium_pipeline.py
+- app/services/interpretation/schemas.py
+- imweb/imweb free-report.html
+- imweb/imweb premium-survey.html
+- imweb/premium_report.html
+- imweb/imweb payment-fail.html
+
+2. 모델 관계 요약표
+
+[UserSession]
+- PK: sid
+- token 관련 컬럼: 없음
+- order_id 관련 컬럼: 없음
+- sid/session 관련 컬럼: sid PK
+- 관계: 코드 선언상 `order`, `paid`, `report` 모두 uselist=False
+- unique 제약 여부: sid PK만 확정
+- 해석: DB 관점에서는 Order.sid가 unique가 아니므로 실제로는 UserSession 1 : N Order가 가능하다. ORM 선언만 1:1처럼 적혀 있다.
+
+[Order]
+- PK: order_id
+- token 관련 컬럼: 직접 컬럼 없음, `pg_payload_json.report_token`, `pg_payload_json.free_token`에 저장
+- order_id 관련 컬럼: order_id PK
+- sid/session 관련 컬럼: sid FK -> user_sessions.sid
+- 관계: DB 관점에서 여러 Order가 하나의 UserSession(sid)에 붙을 수 있음
+- nullable/unique: sid nullable 아님으로 보이나 unique 없음, order_id만 unique(PK)
+- 결론: 같은 free token(report_token) -> 같은 sid -> 여러 Order 생성 가능
+
+[PaidSurvey]
+- PK: sid
+- token 관련 컬럼: 없음
+- order_id 관련 컬럼: 없음
+- sid/session 관련 컬럼: sid FK + PK
+- 관계: UserSession 1 : 1 PaidSurvey
+- unique 제약 여부: sid가 PK라 unique
+- 결론: 하나의 sid / 하나의 free token에 PaidSurvey row는 최대 1개
+
+[Report]
+- PK: sid
+- token 관련 컬럼: report_token unique
+- order_id 관련 컬럼: 없음
+- sid/session 관련 컬럼: sid FK + PK
+- 관계: UserSession 1 : 1 Report
+- unique 제약 여부: sid PK, report_token unique index
+- 결론: free token 컬럼 역할인 `report_token`은 unique다. 하나의 sid에 Report row는 최대 1개이며 premium 결과도 같은 Report row를 덮어쓴다.
+
+핵심 관계 판정
+- free token 컬럼 unique 여부: 예. `reports.report_token` unique
+- order_id unique 여부: 예. `orders.order_id` PK
+- 하나의 free token에 여러 Order가 매달릴 수 있는지: 예. free token -> report row -> sid 는 1개지만, orders.sid는 unique가 아니어서 여러 Order 허용
+- 하나의 Order에 여러 PaidSurvey/Report가 붙을 수 있는지: 직접 FK가 없어서 아니다. 실제로 PaidSurvey/Report는 order_id가 아니라 sid 기준 1개씩만 존재
+
+3. free token / order_id 관계 분석
+
+free flow 생성
+- free 설문 제출 시 `routes_survey.submit_free`가 새 sid를 발급하고 새 free token을 `Report.report_token`에 저장한다.
+- 이 시점에 UserSession 1개, Report 1개가 생성된다.
+
+payment 진입
+- free-report 프론트는 premium 결제 버튼 클릭 시 `report_token=<free token>`과 `free_token=<free token>`를 `/pay/start`에 붙여 보낸다.
+- `routes_payments.build_inicis_form`는 `report_token`으로 Report를 찾고, 해당 sid로 새 Order row를 매번 생성한다.
+- 기존 Order 조회/업데이트 로직이 전혀 없다.
+
+재결제/재시도
+- 같은 free token으로 `/pay/start`를 다시 열면 같은 sid에 대해 또 다른 order_id가 생성된다.
+- 기존 Order를 FAILED/CANCELED 처리하거나 무효화하는 정리 로직도 없다.
+- 따라서 같은 free token에 order 1, order 2, ... 가 누적되는 구조다.
+
+state 선택 규칙
+- order_id를 명시해 premium API를 호출하면 `resolve_premium_state(report_token, order_id)`가 우선 그 order_id row를 직접 조회한다.
+- order_id 없이 premium 상태를 풀면 `_get_preferred_order_for_sid(sid)`가 sid 기준으로 가장 최근 PAID order, 없으면 가장 최근 order를 고른다.
+- 즉 일부 경로는 order_id 중심, 일부 경로는 sid 중심이다.
+
+충돌 가능성 요약
+- Order는 여러 개인데 PaidSurvey/Report는 sid당 1개다.
+- 그래서 order 1에서 저장한 paid survey / generated report가 order 2에서도 그대로 재사용될 수 있다.
+- 반대로 order 2 URL로 들어왔더라도, order_id가 빠진 read/entry 경로는 sid 기준 최신 PAID order를 잡아 order 1/2 구분을 잃는다.
+
+4. 프론트가 실제로 보내는 값 요약
+
+[무료 리포트 -> 결제 진입: imweb/imweb free-report.html]
+- 입력값 source
+  - free token: URL `?token=`, path `/r/{token}`, 없으면 localStorage `rl_free_report_token`
+  - free_return_url: 현재 free-report URL을 정규화해서 localStorage/sessionStorage `rl_free_report_return_url`
+  - premium token storage 정리: `rl_premium_report_token` 등 premium 관련 storage를 free 화면 진입 시 삭제
+- 전송 payload
+  - 결제 버튼 클릭 시 새 창으로 `/pay/start?report_token=<free token>&free_return_url=<normalized free report url>&free_token=<free token>`
+- 성공 시 처리
+  - 결제창만 오픈
+- 실패 시 처리
+  - 팝업 차단 시 alert
+
+[premium-survey: imweb/imweb premium-survey.html]
+- 입력값 source
+  - free token / premium report token으로 쓰이는 REPORT_TOKEN: 1) URL query `token`, 2) path `/r/{token}`, 3) localStorage `rl_report_token`
+  - orderId: URL query `orderId`
+  - sid: 읽지 않음
+  - sessionStorage/localStorage에서 orderId, sid, premium report token 별도 복구 없음
+- 전송 payload
+  - access-check: `GET /api/premium/access-check?token=<REPORT_TOKEN>&orderId=<ORDER_ID>`
+  - submit: `POST /api/survey/paid` body
+    - `schema_version`
+    - `stage`
+    - `report_token`
+    - `order_id`
+    - `answers`
+- 성공 시 처리
+  - 응답에 `redirect_url` 있으면 그쪽 이동
+  - 없고 `report_token` 있으면 `https://relationship-safe-guide-api.onrender.com/r/<report_token>`로 이동
+  - 없고 `next_url` 있으면 그 URL로 이동
+- 실패 시 처리
+  - access-check 실패/비정상 응답/예외: 홈으로 이동
+  - access-check reason이 NOT_PAID: `/payment-pending?token=<REPORT_TOKEN>&orderId=<ORDER_ID>` 이동
+  - submit 실패: 서버 detail/message를 화면 메시지로 노출
+
+[premium report wrapper: imweb/premium_report.html]
+- 입력값 source
+  - premium report token: query `token` -> path `/r/{token}` -> localStorage `rl_premium_report_token`
+  - free token: localStorage `rl_free_report_token`
+  - free return url: localStorage `rl_free_report_return_url`
+  - sid/orderId: 읽지 않음
+- 호출 endpoint
+  - `GET /api/premium/entry?token=<token>`
+  - state READY면 iframe src `/r/<token>`
+- 실패 시 처리
+  - state NOT_PAID면 payment-fail로 redirect
+  - INVALID_REPORT_TOKEN 또는 fetch 실패면 error 화면
+
+프론트 특이사항
+- premium-survey는 `rl_free_report_token`이나 `rl_premium_report_token`을 안 읽고, `rl_report_token`만 읽는다.
+- 현재 저장 키 이름이 다른 페이지들과 불일치한다. free-report는 `rl_free_report_token`, premium wrapper는 `rl_premium_report_token`을 사용한다.
+- 따라서 premium-survey는 사실상 URL의 `token`과 `orderId`에 강하게 의존한다.
+- submit endpoint도 현재 백엔드 라우트와 불일치한다. 프론트는 `/api/survey/paid`, 백엔드는 `/api/premium/survey/paid`.
+
+5. premium report 관련 API별 조회 키 요약
+
+[routes_payments.build_inicis_form]
+- 함수명: build_inicis_form
+- 입력값: report_token, buyer info, free_return_url, free_token
+- 내부 조회 키: `Report.report_token == report_token`, 그 결과 sid로 새 Order 생성
+- 실패 조건: report_token 비어 있음(400), report token으로 Report 못 찾음(404), PG 환경변수 없음(500)
+- 반환값: INICIS form dict
+
+[routes_payments.inicis_return]
+- 함수명: inicis_return
+- 입력값: PG form fields, 특히 orderNumber, merchantData
+- 내부 조회 키: 먼저 `Order.order_id == orderNumber`
+- 실패 조건
+  - resultCode != 0000 -> fail redirect
+  - auth 필드 부족 -> fail redirect
+  - authUrl invalid -> fail redirect
+  - order_id 미존재 -> ORDER_NOT_FOUND redirect
+  - approve HTTP 실패 -> FAILED 처리 후 fail redirect
+  - approve resultCode 실패 -> FAILED 처리 후 fail redirect
+  - merchantData 및 prepared_payload.report_token 둘 다 없음 -> FAILED 처리 후 fail redirect
+- 반환값
+  - 가상계좌면 `/payment-pending?token=<report_token>&orderId=<order_id>`
+  - 일반 결제면 `/premium-survey?token=<report_token>&orderId=<order_id>`
+
+[routes_premium.premium_access_check]
+- 함수명: premium_access_check
+- 입력값: query token, orderId
+- 내부 조회 키: `resolve_premium_state(report_token=token, order_id=orderId)`
+  - report: `Report.report_token`
+  - order: `Order.order_id`
+  - mismatch 확인: order.sid vs report.sid
+- 실패 조건
+  - INVALID_REPORT_TOKEN -> `{ok:false, reason:"INVALID_REPORT_TOKEN"}`
+  - REPORT_ORDER_MISMATCH -> `{ok:false, reason:"SID_MISMATCH"}`
+  - NOT_PAID -> `{ok:false, reason:"NOT_PAID"}`
+- 반환값: `{ok:true}` 또는 reason object
+
+[routes_premium.submit_paid_survey -> services.submit_paid_survey_and_run_pipeline]
+- 함수명: submit_paid_survey / submit_paid_survey_and_run_pipeline
+- 입력값: order_id, report_token, answers, submitted_at
+- 내부 조회 키
+  - validate: `Report.report_token`, `Order.order_id`
+  - PaidSurvey 저장/조회: `PaidSurvey.sid == report.sid`
+  - Session 조회: `UserSession.sid == report.sid`
+  - Report 생성/갱신: 기존 `Report` row 자체 사용
+- 실패 조건
+  - INVALID_REPORT_TOKEN -> 404
+  - REPORT_ORDER_MISMATCH -> 400
+  - NOT_PAID -> 403
+  - paid survey 없어서 preview/generate 시점 진입 못 하면 404 `PAID_SURVEY_NOT_FOUND`
+  - payload schema mismatch면 422 가능
+- 반환값: SurveySubmitOut
+
+[routes_premium.generate_premium_report_payload]
+- 함수명: generate_premium_report_payload
+- 입력값: body `order_id`, `report_token`
+- 내부 조회 키
+  - blocking check: `Report.report_token`, `Order.order_id`
+  - preview build: PaidSurvey는 `sid`
+- 실패 조건
+  - INVALID_REPORT_TOKEN -> 404
+  - REPORT_ORDER_MISMATCH -> 400
+  - NOT_PAID -> 403
+  - PAID_SURVEY_NOT_FOUND -> 404
+- 반환값: sid, prompt, interpretation_result, metrics, meta
+
+[routes_premium.finalize_premium_report]
+- 함수명: finalize_premium_report
+- 입력값: body `order_id`, `report_token`, `overwrite`
+- 내부 조회 키
+  - blocking check: `Report.report_token`, `Order.order_id`
+  - preview build: `sid`
+  - final save: 기존 `Report` row 갱신
+- 실패 조건
+  - INVALID_REPORT_TOKEN -> 404
+  - REPORT_ORDER_MISMATCH -> 400
+  - NOT_PAID -> 403
+  - PAID_SURVEY_NOT_FOUND -> 404
+  - LLM 실패 -> 502
+  - finalize 예외 -> 500
+- 반환값: PremiumReportFinalizeOut
+
+[routes_premium.get_premium_report_status]
+- 함수명: get_premium_report_status
+- 입력값: query sid, order_id, report_token
+- 내부 조회 키
+  - blocking check: `Report.report_token`, `Order.order_id`
+  - sid는 마지막에 `state.sid != sid` 비교만 수행
+- 실패 조건
+  - INVALID_REPORT_TOKEN -> 404
+  - REPORT_ORDER_MISMATCH -> 400
+  - NOT_PAID -> 403
+  - sid mismatch -> 400
+- 반환값: PremiumReportStatusOut
+
+[routes_report.resolve_report_html]
+- 함수명: resolve_report_html
+- 입력값: path/query token
+- 내부 조회 키
+  - `Report.report_token == token`
+  - session: `UserSession.sid == report.sid`
+  - premium state 판단 시 order_id 없이 `resolve_premium_state(report_token=token)` 호출
+  - 이 경우 sid 기준 `_get_preferred_order_for_sid` 사용
+- 실패 조건
+  - token으로 Report 없음 -> HTTP 404 Invalid token
+  - sid로 Session 없음 -> HTTP 404 Session not found
+  - premium state invalid -> 404 state html
+  - premium flow인데 NOT_PAID -> payment-fail redirect
+- 반환값
+  - free token이면 free report html
+  - premium READY면 premium html
+  - NEED_SURVEY/PROCESSING이면 해당 state html
+
+6. Not Found 발생 가능 지점 목록
+
+백엔드 404
+- `build_inicis_form`: report token으로 Report 못 찾을 때
+- `resolve_premium_state`: report_token으로 Report 못 찾으면 state = INVALID_REPORT_TOKEN
+- `_raise_for_blocking_state`: INVALID_REPORT_TOKEN이면 404
+- `_get_session_or_raise`: sid로 UserSession 못 찾으면 404 SESSION_NOT_FOUND
+- `_load_paid_answers_or_raise`: sid로 PaidSurvey 못 찾으면 404 PAID_SURVEY_NOT_FOUND
+- `prepare_premium_preview_or_raise`: validated context 이후 paid survey 없으면 404 PAID_SURVEY_NOT_FOUND
+- `routes_report.load_report_and_session_by_token`: token invalid / session missing이면 404
+- `inicis_vbank_notify`: P_OID 없거나 order 못 찾으면 plain text NOT_FOUND 404
+
+프론트/라우트 불일치로 인한 404
+- `premium-survey.html` submit endpoint가 `/api/survey/paid`인데, 현재 등록 라우트는 `/api/premium/survey/paid`다.
+- 이 상태 그대로면 설문 제출 시 서버 레벨 404가 날 가능성이 매우 높다.
+- 이 경우 사용자는 premium-survey 화면에서 generic submit 실패 메시지로 보게 된다. 정확한 백엔드 detail이 없으면 `유료설문 저장에 실패했습니다.` 계열 메시지로 보인다.
+
+사용자가 체감하는 Not Found/유사 증상
+- premium-survey access-check에서 비정상 응답/404/네트워크 오류면 홈으로 보내 버린다. 화면상 명시적 Not Found가 아니라 “그냥 홈으로 튕김”으로 체감될 수 있다.
+- premium report wrapper에서 entry fetch 실패 또는 INVALID_REPORT_TOKEN이면 자체 error 화면을 보여준다.
+- `/r/<token>` 직접 접근 시 premium token인데 order 미결제 상태면 404가 아니라 payment-fail redirect다.
+
+7. 같은 token에 여러 order가 붙어 꼬인다 가설의 판정
+- 판정: 가능성 높음
+
+판정 근거
+- 같은 free token으로 결제 진입할 때마다 `orders`에 새 row를 무조건 insert한다.
+- `orders.sid`에 unique 제약이 없어 같은 sid에 여러 order가 허용된다.
+- 하지만 `paid_surveys`와 `reports`는 sid당 1행이다.
+- 즉 order는 여러 개인데 유료설문/리포트 결과는 sid 단위 단일 row라서, order별 분리가 구조적으로 불가능하다.
+- 일부 API는 order_id를 명시적으로 검증하지만, 일부 read 경로(`/api/premium/entry`, `/r/<token>`)는 order_id 없이 sid 기준 “선호 order”를 고른다.
+- 따라서 같은 sid에 여러 paid order가 생기면 order 2 URL로 들어왔더라도 내부적으로 order 1 또는 최신 paid order에 종속된 state를 보게 될 수 있다.
+
+단, 보정 사항
+- “generate API가 token A 또는 sid 기준으로 order 1을 잘못 조회한다”는 표현은 절반만 맞다.
+- generate/finalize/status/submit 본체는 전달받은 `order_id`를 직접 사용하고, sid mismatch도 검사한다.
+- 꼬임의 핵심은 generate 자체보다 `PaidSurvey`와 `Report`가 sid 단일 row라서 order 구분이 저장 단계에서 사라진다는 점, 그리고 read/entry 쪽 일부 경로가 order_id 없이 sid 기준으로 상태를 푼다는 점이다.
+
+8. 가장 유력한 실제 원인 1~3순위
+
+1순위
+- 데이터 모델 불일치
+- Order는 sid당 여러 개 생성 가능하지만 PaidSurvey/Report는 sid당 1개뿐이다.
+- 그래서 “같은 token에 여러 order” 상황이 생기면 결과 데이터가 order별로 격리되지 않는다.
+
+2순위
+- 일부 premium read 경로가 order_id를 잃어버림
+- `/api/premium/entry?token=...` 와 `/r/<token>`는 order_id 없이 sid 기준 `_get_preferred_order_for_sid`를 사용한다.
+- 사용자가 어떤 order에서 들어왔는지와 무관하게 최신 PAID order 또는 최신 order로 해석될 수 있다.
+
+3순위
+- 프론트/백엔드 endpoint 및 storage key 불일치
+- premium-survey submit URL이 현재 라우터와 다르고, token storage key도 다른 페이지들과 불일치한다.
+- 이건 충돌 가설과 별개로 실제 Not Found/오동작을 만들 수 있는 독립 원인이다.
+
+9. 재현 절차
+
+충돌 구조 재현 절차
+1. free 설문을 완료해 free token A와 sid S를 생성한다.
+2. free-report에서 premium 결제 버튼을 눌러 order 1을 만든다.
+3. 결제창에서 취소하거나 승인 실패로 order 1을 `PENDING` 또는 `FAILED` 근처 상태로 남긴다.
+4. 같은 free token A 화면으로 돌아와 premium 결제 버튼을 다시 눌러 order 2를 만든다.
+5. 이번에는 결제를 성공시켜 `/premium-survey?token=A&orderId=order2`로 진입한다.
+6. 이 시점 DB에는 같은 sid S에 order 1, order 2가 공존한다.
+7. 유료설문을 저장하면 PaidSurvey는 sid S 기준 단일 row로 저장된다.
+8. premium report가 생성되면 Report도 sid S의 기존 row를 덮어쓴다.
+9. 이후 `/r/A` 또는 `/api/premium/entry?token=A` 같은 order_id 없는 경로로 진입하면 sid S 기준 `_get_preferred_order_for_sid`가 선택한 order에 의해 상태가 결정된다.
+10. order 1, order 2 중 무엇이 더 최근 PAID인지에 따라 사용자가 기대한 order와 다른 상태/결과를 보게 될 수 있다.
+
+실제 최소 재현 조건
+- 같은 free token으로 결제 2회 이상 진입
+- 첫 order가 정리되지 않은 상태로 남아 있을 것
+- 둘 중 최소 1개는 PAID일 것
+- premium-survey 또는 premium wrapper 진입 시 token은 같고 orderId는 서로 다른 값을 사용할 수 있을 것
+- 이후 `/r/<token>` 또는 `/api/premium/entry?token=<token>`처럼 order_id 없는 읽기 경로를 타면 혼선이 드러날 가능성이 높다
+
+별도 최소 404 재현 조건
+- 현재 코드 기준 `premium-survey.html`에서 제출 버튼 클릭
+- 프론트는 `POST /api/survey/paid`를 호출
+- 서버는 해당 경로를 등록하지 않았으므로 404 가능성 높음
+
+10. 다음 수정 권장 포인트
+- Order와 PaidSurvey/Report의 식별 축을 일치시켜야 한다. 최소한 PaidSurvey/Report가 order_id를 명시적으로 갖거나, 하나의 sid에 order를 1개만 허용해야 한다.
+- premium read 경로(`/api/premium/entry`, `/r/<token>`)에서 order_id 없이 상태를 추론하는 로직을 재검토해야 한다.
+- 결제 재진입 시 기존 order를 재사용할지, 이전 미완료 order를 무효화할지 정책이 필요하다.
+- premium-survey 프론트의 submit endpoint를 실제 라우트와 맞춰야 한다.
+- premium-survey의 token storage key도 현재 프로젝트의 free/premium storage convention과 맞춰야 한다.
+- ORM relationship에서 `UserSession.order uselist=False`는 현 DB 구조와 맞지 않으므로 오해를 유발한다.
+
+읽기 전용 디버깅 로그 삽입 제안
+- payment success callback 직후
+  - order_id, sid, prepared_payload.report_token, prepared_payload.free_token, 기존 sid의 order 개수
+- premium-survey access-check 직전
+  - URL token, orderId, localStorage에서 읽은 token source
+- premium-survey submit 직전
+  - report_token, order_id, endpoint URL
+- `resolve_premium_state` 진입 직후
+  - 입력 report_token, 입력 order_id, report.sid, 선택된 order.order_id, order.status, 선택 근거(explicit order_id / preferred order)
+- `submit_paid_survey_and_run_pipeline` 저장 직전
+  - report.sid, order.order_id, paid_survey existing 여부
+- `/r/<token>` 진입 직후
+  - token, report.sid, order_id 인자 없음 여부, preferred order 선택 결과
+- 404/INVALID_REPORT_TOKEN 직전
+  - 입력 token/order_id, lookup 결과
+
+- 결론:
+- 직접 원인: 같은 free token(sid)에 여러 Order를 허용하면서 PaidSurvey/Report는 sid당 1개만 저장하는 데이터 모델 불일치
+- 보조 원인: order_id 없는 read 경로의 sid 기반 preferred-order 선택, premium-survey의 submit endpoint 및 storage key 불일치
+- 가장 먼저 고쳐야 할 지점: `Order`와 `PaidSurvey`/`Report`의 식별 키를 맞추는 것(최소한 order_id 기준으로 premium 결과를 분리하거나, sid당 Order를 1개로 제한)

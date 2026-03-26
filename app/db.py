@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
@@ -41,6 +41,34 @@ if DATABASE_URL.startswith("sqlite"):
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+
+def ensure_runtime_schema() -> None:
+    """
+    Lightweight runtime schema sync for the dev/prototype deployment model.
+    Creates new tables via metadata and adds missing `orders` columns that
+    older environments will not get from `create_all`.
+    """
+    Base.metadata.create_all(bind=engine)
+
+    order_columns = {
+        "free_report_token": "VARCHAR(128)",
+        "payment_method": "VARCHAR(32)",
+        "created_at": "TIMESTAMP",
+        "updated_at": "TIMESTAMP",
+    }
+
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        existing_tables = set(inspector.get_table_names())
+        if "orders" not in existing_tables:
+            return
+
+        existing_columns = {col["name"] for col in inspector.get_columns("orders")}
+        for column_name, column_type in order_columns.items():
+            if column_name in existing_columns:
+                continue
+            conn.execute(text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}"))
 
 def get_db():
     db = SessionLocal()

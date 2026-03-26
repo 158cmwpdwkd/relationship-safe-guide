@@ -389,7 +389,8 @@
     const ENTRY_URL = API_BASE + "/api/premium/entry";
     const HOME_URL = "https://reconnectlab.co.kr/";
     const PAYMENT_FAIL_URL = HOME_URL.replace(/\/$/, "") + "/payment-fail";
-    const STORAGE_KEY = "rl_premium_report_token";
+    const ACTIVE_ORDER_ID_STORAGE_KEY = "rl_active_order_id";
+    const PREMIUM_REPORT_TOKEN_STORAGE_KEY = "rl_premium_report_token";
     const FREE_RETURN_URL_STORAGE_KEY = "rl_free_report_return_url";
     const FREE_REPORT_TOKEN_STORAGE_KEY = "rl_free_report_token";
     const POLL_INTERVAL_MS = 3000;
@@ -669,21 +670,21 @@
       return "";
     }
 
-    function buildPaymentFailUrl(reason, token) {
+    function buildPaymentFailUrl(reason, orderId) {
       const params = new URLSearchParams();
       const returnUrl = resolveFreeReturnUrl();
       const freeToken = getStoredFreeReportToken();
       if (reason) params.set("reason", reason);
       if (returnUrl) params.set("free_return_url", returnUrl);
       if (freeToken) params.set("free_token", freeToken);
-      if (token) params.set("report_token", token);
+      if (orderId) params.set("orderId", orderId);
       return PAYMENT_FAIL_URL + (params.toString() ? ("?" + params.toString()) : "");
     }
 
-    function redirectToPaymentFail(reason, token) {
-      const targetUrl = buildPaymentFailUrl(reason, token);
+    function redirectToPaymentFail(reason, orderId) {
+      const targetUrl = buildPaymentFailUrl(reason, orderId);
       debugLog("premium.not_paid.redirect_payment_fail", {
-        token: token || "",
+        orderId: orderId || "",
         targetUrl: targetUrl
       });
       debugLog("premium.not_paid.redirect_reason", { reason: reason || "not_paid" });
@@ -878,17 +879,17 @@
       }
     }
 
-    function getStoredToken() {
+    function getStoredOrderId() {
       try {
-        return localStorage.getItem(STORAGE_KEY) || "";
+        return localStorage.getItem(ACTIVE_ORDER_ID_STORAGE_KEY) || "";
       } catch (e) {
         return "";
       }
     }
 
-    function setStoredToken(token) {
+    function setStoredOrderId(orderId) {
       try {
-        if (token) localStorage.setItem(STORAGE_KEY, token);
+        if (orderId) localStorage.setItem(ACTIVE_ORDER_ID_STORAGE_KEY, orderId);
       } catch (e) {}
     }
 
@@ -899,33 +900,37 @@
       resetFrame("enter_cleanup");
     }
 
-    function getToken() {
-      return getQueryToken() || getPathToken() || getStoredToken() || "";
+    function getOrderId() {
+      try {
+        return new URLSearchParams(window.location.search).get("orderId") || getStoredOrderId() || "";
+      } catch (e) {
+        return getStoredOrderId() || "";
+      }
     }
 
-    async function fetchEntry(token) {
+    async function fetchEntry(orderId) {
       const url = new URL(ENTRY_URL);
-      url.searchParams.set("token", token);
-      debugLog("entry.fetch.start", { token: token, url: url.toString() });
+      url.searchParams.set("orderId", orderId);
+      debugLog("entry.fetch.start", { orderId: orderId, url: url.toString() });
       const res = await fetch(url.toString(), { method: "GET" });
-      debugLog("entry.fetch.end", { token: token, ok: res.ok, status: res.status });
+      debugLog("entry.fetch.end", { orderId: orderId, ok: res.ok, status: res.status });
       if (!res.ok) {
         throw new Error("ENTRY_FETCH_FAILED");
       }
       return res.json();
     }
 
-    function scheduleRecheck(token) {
+    function scheduleRecheck(orderId) {
       clearPolling("reschedule");
       if (currentState !== "PROCESSING") {
-        debugLog("scheduleRecheck.skip", { reason: "state_not_processing", state: currentState, token: token });
+        debugLog("scheduleRecheck.skip", { reason: "state_not_processing", state: currentState, orderId: orderId });
         return;
       }
       pollHandle = setTimeout(function () {
-        debugLog("poll.fire", { token: token });
-        boot(token);
+        debugLog("poll.fire", { orderId: orderId });
+        boot(orderId);
       }, POLL_INTERVAL_MS);
-      debugLog("poll.schedule", { token: token, delay: POLL_INTERVAL_MS });
+      debugLog("poll.schedule", { orderId: orderId, delay: POLL_INTERVAL_MS });
     }
 
     function applyFrameHeight(target, sessionId) {
@@ -1018,50 +1023,50 @@
       });
     }
 
-    async function boot(initialToken) {
-      const token = initialToken || getToken();
+    async function boot(initialOrderId) {
+      const orderId = initialOrderId || getOrderId();
       debugLog("premium.enter", {
-        token: token,
+        orderId: orderId,
         href: window.location.href
       });
-      if (!token) {
-        debugLog("boot.skip", { reason: "missing_token" });
+      if (!orderId) {
+        debugLog("boot.skip", { reason: "missing_order_id" });
         clearPolling("missing_token");
         showError();
         return;
       }
 
       if (entryInFlight) {
-        debugLog("boot.skip", { reason: "entry_in_flight", token: token });
+        debugLog("boot.skip", { reason: "entry_in_flight", orderId: orderId });
         return;
       }
 
       const seq = ++bootSeq;
       entryInFlight = true;
-      setStoredToken(token);
+      setStoredOrderId(orderId);
       cleanupPremiumRuntimeState();
       showLoading(defaultLoadingTitle, defaultLoadingCopy);
 
       try {
-        const data = await fetchEntry(token);
+        const data = await fetchEntry(orderId);
         if (seq !== bootSeq) {
-          debugLog("boot.stale", { seq: seq, bootSeq: bootSeq, token: token });
+          debugLog("boot.stale", { seq: seq, bootSeq: bootSeq, orderId: orderId });
           return;
         }
 
         const state = data.state || "";
-        debugLog("boot.resolve", { token: token, state: state });
+        debugLog("boot.resolve", { orderId: orderId, state: state, premiumReportToken: data.premium_report_token || "" });
 
-        if (state === "INVALID_REPORT_TOKEN") {
+        if (state === "ORDER_NOT_FOUND") {
           showError();
           return;
         }
 
         if (state === "NOT_PAID") {
-          debugLog("payment.cancel", { token: token, nextUrl: data.next_url || "" });
-          debugLog("payment.cancel_or_not_paid", { token: token, nextUrl: data.next_url || "" });
-          debugLog("premium.state.not_paid", { token: token });
-          redirectToPaymentFail("not_paid", token);
+          debugLog("payment.cancel", { orderId: orderId, nextUrl: data.next_url || "" });
+          debugLog("payment.cancel_or_not_paid", { orderId: orderId, nextUrl: data.next_url || "" });
+          debugLog("premium.state.not_paid", { orderId: orderId });
+          redirectToPaymentFail("not_paid", orderId);
           return;
         }
 
@@ -1070,7 +1075,7 @@
             "유료 설문 작성이 필요합니다.",
             data.user_message || "설문 작성 후 프리미엄 리포트가 생성됩니다.",
             "설문 작성하기",
-            data.next_url || "#"
+            data.next_url || (HOME_URL.replace(/\/$/, "") + "/premium-survey?orderId=" + encodeURIComponent(orderId))
           );
           return;
         }
@@ -1080,22 +1085,25 @@
             "프리미엄 리포트를 생성 중입니다",
             data.user_message || "생성이 완료되면 자동으로 표시됩니다."
           );
-          scheduleRecheck(token);
+          scheduleRecheck(orderId);
           return;
         }
 
-        if (state === "READY") {
-          showFrame(token);
+        if (state === "READY" && data.premium_report_token) {
+          try {
+            localStorage.setItem(PREMIUM_REPORT_TOKEN_STORAGE_KEY, data.premium_report_token);
+          } catch (e) {}
+          showFrame(data.premium_report_token);
           return;
         }
 
         showError();
       } catch (e) {
         if (seq !== bootSeq) {
-          debugLog("boot.error.stale", { seq: seq, bootSeq: bootSeq, token: token });
+          debugLog("boot.error.stale", { seq: seq, bootSeq: bootSeq, orderId: orderId });
           return;
         }
-        debugLog("boot.error", { token: token, message: e && e.message ? e.message : String(e) });
+        debugLog("boot.error", { orderId: orderId, message: e && e.message ? e.message : String(e) });
         showError();
       } finally {
         if (seq === bootSeq) {

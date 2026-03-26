@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Order, PaidSurvey, Report, UserSession
+from app.models import Order, PaidSurvey, PremiumReport, UserSession
+from app.report import new_token
 from app.schemas import PremiumEntryOut, PremiumStateOut, SurveySubmitOut
 from app.services.interpretation.schemas import EngineInput, PaidSurveyAnswers
 from app.services.reporting.llm_client import PremiumLLMError
@@ -17,30 +18,12 @@ from app.services.reporting.premium_pipeline import (
 PAYMENT_FAIL_PATH = "/payment-fail"
 
 
-def _get_report_by_token(*, report_token: str, db: Session) -> Report | None:
-    return db.query(Report).filter(Report.report_token == report_token).first()
+def _premium_token() -> str:
+    return "t_premium_" + new_token()
 
 
-def _get_order_by_id(*, order_id: str, db: Session) -> Order | None:
+def _get_order(*, order_id: str, db: Session) -> Order | None:
     return db.query(Order).filter(Order.order_id == order_id).first()
-
-
-def _get_preferred_order_for_sid(*, sid: str, db: Session) -> Order | None:
-    paid_order = (
-        db.query(Order)
-        .filter(Order.sid == sid, Order.status == "PAID")
-        .order_by(Order.paid_at.desc(), Order.order_id.desc())
-        .first()
-    )
-    if paid_order:
-        return paid_order
-
-    return (
-        db.query(Order)
-        .filter(Order.sid == sid)
-        .order_by(Order.paid_at.desc(), Order.order_id.desc())
-        .first()
-    )
 
 
 def _get_session_or_raise(*, sid: str, db: Session) -> UserSession:
@@ -50,12 +33,42 @@ def _get_session_or_raise(*, sid: str, db: Session) -> UserSession:
     return session
 
 
-def _get_paid_survey(*, sid: str, db: Session) -> PaidSurvey | None:
-    return db.query(PaidSurvey).filter(PaidSurvey.sid == sid).first()
+def _get_paid_survey(*, order_id: str, db: Session) -> PaidSurvey | None:
+    return db.query(PaidSurvey).filter(PaidSurvey.order_id == order_id).first()
 
 
-def _load_paid_answers_or_raise(*, sid: str, db: Session) -> PaidSurveyAnswers:
-    paid = _get_paid_survey(sid=sid, db=db)
+def _get_premium_report(*, order_id: str, db: Session) -> PremiumReport | None:
+    return db.query(PremiumReport).filter(PremiumReport.order_id == order_id).first()
+
+
+def get_premium_report_by_token(*, premium_report_token: str, db: Session) -> PremiumReport | None:
+    return (
+        db.query(PremiumReport)
+        .filter(PremiumReport.premium_report_token == premium_report_token)
+        .first()
+    )
+
+
+def _ensure_premium_report(*, order: Order, db: Session) -> PremiumReport:
+    premium_report = _get_premium_report(order_id=order.order_id, db=db)
+    if premium_report:
+        return premium_report
+
+    premium_report = PremiumReport(
+        order_id=order.order_id,
+        sid=order.sid,
+        free_report_token=order.free_report_token,
+        premium_report_token=_premium_token(),
+        status="GENERATING",
+    )
+    db.add(premium_report)
+    db.commit()
+    db.refresh(premium_report)
+    return premium_report
+
+
+def _load_paid_answers_or_raise(*, order_id: str, db: Session) -> PaidSurveyAnswers:
+    paid = _get_paid_survey(order_id=order_id, db=db)
     if not paid:
         raise HTTPException(status_code=404, detail="PAID_SURVEY_NOT_FOUND")
 
@@ -72,9 +85,7 @@ def _load_paid_answers_or_raise(*, sid: str, db: Session) -> PaidSurveyAnswers:
 
 def _build_engine_input(
     *,
-    sid: str,
-    order_id: str,
-    report_token: str,
+    order: Order,
     session: UserSession,
     paid_answers: PaidSurveyAnswers,
 ) -> EngineInput:
@@ -84,9 +95,9 @@ def _build_engine_input(
         free_answers = {}
 
     return EngineInput(
-        sid=sid,
-        order_id=order_id,
-        report_token=report_token,
+        sid=order.sid,
+        order_id=order.order_id,
+        report_token=order.free_report_token or "",
         free_risk_level=session.risk_level or "LOW",
         free_impulse_index=session.impulse_index,
         free_answers=free_answers,
@@ -94,133 +105,104 @@ def _build_engine_input(
     )
 
 
-def resolve_premium_state(
-    *,
-    report_token: str,
-    order_id: str | None = None,
-    db: Session,
-) -> PremiumStateOut:
-    report = _get_report_by_token(report_token=report_token, db=db)
-    if not report:
+def resolve_premium_state(*, order_id: str, db: Session) -> PremiumStateOut:
+    order = _get_order(order_id=order_id, db=db)
+    if not order:
         return PremiumStateOut(
-            state="INVALID_REPORT_TOKEN",
-            report_token=report_token,
+            state="ORDER_NOT_FOUND",
+            order_id=order_id,
             next_action="SHOW_ERROR",
             next_url=None,
-            user_message="유효하지 않은 리포트 토큰입니다.",
+            user_message="주문 정보를 찾을 수 없습니다.",
         )
 
-    order = None
-    if order_id:
-        order = _get_order_by_id(order_id=order_id, db=db)
-        if order and order.sid != report.sid:
-            return PremiumStateOut(
-                state="REPORT_ORDER_MISMATCH",
-                sid=report.sid,
-                order_id=order_id,
-                report_token=report_token,
-                report_url=f"/r/{report_token}",
-                next_action="SHOW_ERROR",
-                next_url=None,
-                user_message="주문 정보와 리포트가 일치하지 않습니다.",
-            )
-    else:
-        order = _get_preferred_order_for_sid(sid=report.sid, db=db)
-
-    if not order or order.status != "PAID":
+    if order.status != "PAID":
         return PremiumStateOut(
             state="NOT_PAID",
-            sid=report.sid,
-            order_id=order.order_id if order else order_id,
-            report_token=report_token,
-            report_url=f"/r/{report_token}",
-            next_action="SHOW_ERROR",
-            next_url=f"{PAYMENT_FAIL_PATH}?reason=not_paid&report_token={report_token}",
-            user_message="결제가 필요합니다.",
+            sid=order.sid,
+            order_id=order.order_id,
+            free_report_token=order.free_report_token,
+            next_action="GO_PAYMENT",
+            next_url=f"{PAYMENT_FAIL_PATH}?reason=not_paid&orderId={order.order_id}",
+            user_message="결제가 완료된 주문만 이용할 수 있습니다.",
         )
 
-    paid = _get_paid_survey(sid=report.sid, db=db)
+    paid = _get_paid_survey(order_id=order.order_id, db=db)
+    premium_report = _get_premium_report(order_id=order.order_id, db=db)
+
     if not paid:
         return PremiumStateOut(
             state="NEED_SURVEY",
-            sid=report.sid,
+            sid=order.sid,
             order_id=order.order_id,
-            report_token=report_token,
-            report_url=f"/r/{report_token}",
+            free_report_token=order.free_report_token,
+            premium_report_token=(
+                premium_report.premium_report_token if premium_report else None
+            ),
             next_action="GO_SURVEY",
-            next_url=f"/premium-survey?token={report_token}&orderId={order.order_id}",
+            next_url=f"/premium-survey?orderId={order.order_id}",
             user_message="유료 설문 작성이 필요합니다.",
         )
 
-    has_html = bool((report.html or "").strip())
-    has_markdown = bool((report.markdown or "").strip())
-    if report.status == "READY" and has_html and has_markdown:
+    if premium_report and premium_report.status == "READY" and (premium_report.html or "").strip():
         return PremiumStateOut(
             state="READY",
-            sid=report.sid,
+            sid=order.sid,
             order_id=order.order_id,
-            report_token=report_token,
-            report_url=f"/r/{report_token}",
+            free_report_token=order.free_report_token,
+            premium_report_token=premium_report.premium_report_token,
+            report_url=f"/r/{premium_report.premium_report_token}",
             next_action="OPEN_REPORT",
-            next_url=f"/r/{report_token}",
+            next_url=f"/r/{premium_report.premium_report_token}",
             user_message="프리미엄 리포트가 준비되었습니다.",
             has_paid_survey=True,
-            has_report_html=has_html,
-            has_report_markdown=has_markdown,
+            has_report_html=True,
+            has_report_markdown=bool((premium_report.markdown or "").strip()),
         )
 
     return PremiumStateOut(
         state="PROCESSING",
-        sid=report.sid,
+        sid=order.sid,
         order_id=order.order_id,
-        report_token=report_token,
-        report_url=f"/r/{report_token}",
-        next_action="POLL_STATUS",
-        next_url=(
-            f"/api/premium/report/status?sid={report.sid}"
-            f"&order_id={order.order_id}&report_token={report_token}"
+        free_report_token=order.free_report_token,
+        premium_report_token=(premium_report.premium_report_token if premium_report else None),
+        report_url=(
+            f"/r/{premium_report.premium_report_token}"
+            if premium_report and premium_report.premium_report_token
+            else None
         ),
+        next_action="POLL_STATUS",
+        next_url=f"/api/premium/report/status?order_id={order.order_id}",
         user_message="프리미엄 리포트를 생성 중입니다.",
         has_paid_survey=True,
-        has_report_html=has_html,
-        has_report_markdown=has_markdown,
+        has_report_html=bool(premium_report and (premium_report.html or "").strip()),
+        has_report_markdown=bool(premium_report and (premium_report.markdown or "").strip()),
     )
 
 
-def _get_validated_context(
-    *,
-    report_token: str,
-    order_id: str,
-    db: Session,
-):
-    state = resolve_premium_state(report_token=report_token, order_id=order_id, db=db)
-    if state.state == "INVALID_REPORT_TOKEN":
-        raise HTTPException(status_code=404, detail="INVALID_REPORT_TOKEN")
-    if state.state == "REPORT_ORDER_MISMATCH":
-        raise HTTPException(status_code=400, detail="REPORT_ORDER_MISMATCH")
+def _get_validated_context(*, order_id: str, db: Session):
+    state = resolve_premium_state(order_id=order_id, db=db)
+    if state.state == "ORDER_NOT_FOUND":
+        raise HTTPException(status_code=404, detail="ORDER_NOT_FOUND")
     if state.state == "NOT_PAID":
         raise HTTPException(status_code=403, detail="NOT_PAID")
 
-    report = _get_report_by_token(report_token=report_token, db=db)
-    order = _get_order_by_id(order_id=order_id, db=db)
-    session = _get_session_or_raise(sid=report.sid, db=db)
-    paid = _get_paid_survey(sid=report.sid, db=db)
-    return report, order, session, paid, state
+    order = _get_order(order_id=order_id, db=db)
+    session = _get_session_or_raise(sid=order.sid, db=db)
+    paid = _get_paid_survey(order_id=order.order_id, db=db)
+    premium_report = _get_premium_report(order_id=order.order_id, db=db)
+    return order, session, paid, premium_report, state
 
 
-def build_entry_response(
-    *,
-    report_token: str,
-    order_id: str | None,
-    db: Session,
-) -> PremiumEntryOut:
-    state = resolve_premium_state(report_token=report_token, order_id=order_id, db=db)
+def build_entry_response(*, order_id: str, db: Session) -> PremiumEntryOut:
+    state = resolve_premium_state(order_id=order_id, db=db)
     return PremiumEntryOut(
         ok=True,
         state=state.state,
         sid=state.sid,
         order_id=state.order_id,
-        report_token=state.report_token,
+        free_report_token=state.free_report_token,
+        premium_report_token=state.premium_report_token,
         next_action=state.next_action,
         next_url=state.next_url,
         user_message=state.user_message,
@@ -228,100 +210,89 @@ def build_entry_response(
     )
 
 
-def prepare_premium_preview_or_raise(
-    *,
-    report_token: str,
-    order_id: str,
-    db: Session,
-):
-    report, order, session, paid, _ = _get_validated_context(
-        report_token=report_token,
-        order_id=order_id,
-        db=db,
-    )
+def prepare_premium_preview_or_raise(*, order_id: str, db: Session):
+    order, session, paid, premium_report, _ = _get_validated_context(order_id=order_id, db=db)
     if not paid:
         raise HTTPException(status_code=404, detail="PAID_SURVEY_NOT_FOUND")
 
-    paid_answers = _load_paid_answers_or_raise(sid=report.sid, db=db)
+    paid_answers = _load_paid_answers_or_raise(order_id=order.order_id, db=db)
     engine_input = _build_engine_input(
-        sid=report.sid,
-        order_id=order.order_id,
-        report_token=report.report_token,
+        order=order,
         session=session,
         paid_answers=paid_answers,
     )
     preview = prepare_premium_report_payload(engine_input)
-    return report, order, session, preview
+    return order, session, paid, premium_report, preview
 
 
 def run_premium_pipeline(
     *,
-    report_token: str,
     order_id: str,
     db: Session,
-    overwrite: bool = True,
-) -> PremiumStateOut:
-    report, order, _, preview = prepare_premium_preview_or_raise(
-        report_token=report_token,
+    overwrite: bool = False,
+):
+    order, _, _, premium_report, preview = prepare_premium_preview_or_raise(
         order_id=order_id,
         db=db,
     )
+    premium_report = premium_report or _ensure_premium_report(order=order, db=db)
 
-    existing_html = (report.html or "").strip()
-    existing_markdown = (report.markdown or "").strip()
+    existing_html = (premium_report.html or "").strip()
+    existing_markdown = (premium_report.markdown or "").strip()
     if (
         not overwrite
-        and report.status == "READY"
+        and premium_report.status == "READY"
         and existing_html
         and existing_markdown
     ):
-        return resolve_premium_state(report_token=report_token, order_id=order_id, db=db)
+        return premium_report, resolve_premium_state(order_id=order_id, db=db), preview, True
 
     try:
         artifacts = generate_premium_report_artifacts(
             prompt=preview["prompt"],
             metrics=preview["metrics"],
         )
+        premium_report.updated_at = datetime.utcnow()
         finalize_premium_report_record(
-            report=report,
+            report=premium_report,
             markdown_text=artifacts["markdown"],
             html_text=artifacts["html"],
             db=db,
-            overwrite=overwrite,
+            overwrite=True,
         )
+        premium_report.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(premium_report)
     except PremiumLLMError as e:
         db.rollback()
-        failed = _get_report_by_token(report_token=report_token, db=db)
+        failed = _get_premium_report(order_id=order_id, db=db)
         if failed:
             failed.status = "FAILED"
+            failed.updated_at = datetime.utcnow()
             db.commit()
         raise HTTPException(status_code=502, detail=f"LLM_CALL_FAILED: {e}")
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        failed = _get_report_by_token(report_token=report_token, db=db)
+        failed = _get_premium_report(order_id=order_id, db=db)
         if failed:
             failed.status = "FAILED"
+            failed.updated_at = datetime.utcnow()
             db.commit()
         raise HTTPException(status_code=500, detail=f"PREMIUM_REPORT_FINALIZE_FAILED: {e}")
 
-    return resolve_premium_state(report_token=report_token, order_id=order_id, db=db)
+    return premium_report, resolve_premium_state(order_id=order_id, db=db), preview, False
 
 
-def submit_paid_survey_and_run_pipeline(
+def submit_paid_survey(
     *,
-    report_token: str,
     order_id: str,
     answers: PaidSurveyAnswers,
     submitted_at: datetime | None,
     db: Session,
 ) -> SurveySubmitOut:
-    report, order, _, paid, _ = _get_validated_context(
-        report_token=report_token,
-        order_id=order_id,
-        db=db,
-    )
+    order, _, paid, premium_report, _ = _get_validated_context(order_id=order_id, db=db)
 
     payload_json = json.dumps(answers.model_dump(mode="json"), ensure_ascii=False)
     saved_at = submitted_at or datetime.now(UTC)
@@ -332,33 +303,29 @@ def submit_paid_survey_and_run_pipeline(
         saved = True
     else:
         paid = PaidSurvey(
-            sid=report.sid,
+            order_id=order.order_id,
+            sid=order.sid,
             answers_json=payload_json,
             submitted_at=saved_at,
         )
         db.add(paid)
         saved = True
 
+    order.updated_at = datetime.utcnow()
     db.commit()
 
-    final_state = run_premium_pipeline(
-        report_token=report_token,
-        order_id=order_id,
-        db=db,
-        overwrite=True,
-    )
-
-    next_value = "OPEN_REPORT" if final_state.state == "READY" else "POLL_STATUS"
+    state = resolve_premium_state(order_id=order_id, db=db)
     return SurveySubmitOut(
         ok=True,
-        sid=report.sid,
+        sid=order.sid,
         saved=saved,
-        next=next_value,
+        next="OPEN_REPORT" if premium_report and premium_report.premium_report_token else "GENERATE_REPORT",
         order_id=order.order_id,
-        report_token=report.report_token,
-        state=final_state.state,
-        next_action=final_state.next_action,
-        next_url=final_state.next_url,
-        user_message=final_state.user_message,
-        report_url=final_state.report_url,
+        free_report_token=order.free_report_token,
+        premium_report_token=(premium_report.premium_report_token if premium_report else None),
+        state=state.state,
+        next_action=state.next_action,
+        next_url=state.next_url,
+        user_message="유료 설문이 저장되었습니다.",
+        report_url=state.report_url,
     )

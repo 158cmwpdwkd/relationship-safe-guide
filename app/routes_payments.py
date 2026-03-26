@@ -4,6 +4,7 @@ import json
 import time
 import uuid
 import hashlib
+import traceback
 from datetime import datetime
 from urllib.parse import urlparse, quote
 from typing import Optional
@@ -62,6 +63,21 @@ def build_payment_fail_target(*, free_return_url: str = "", free_token: str = ""
         mode=mode,
     )
     return f"{PAYMENT_FAIL_URL}?{query}" if query else PAYMENT_FAIL_URL
+
+
+def log_payment_return(event: str, **payload) -> None:
+    try:
+        print(f"{event} {json.dumps(payload, ensure_ascii=False, default=str)}")
+    except Exception:
+        print(f"{event} {payload}")
+
+
+def build_payment_success_target(*, order_id: str) -> str:
+    return f"{SERVICE_BASE_URL}/premium-survey?orderId={quote((order_id or '').strip())}"
+
+
+def build_payment_home_target(*, reason: str) -> str:
+    return f"{SERVICE_BASE_URL}/?payment_reason={quote((reason or '').strip())}"
 
 
 def _render_client_return_page(*, mode: str, code: str = "", msg: str = "", free_return_url: str = "", free_token: str = "") -> RedirectResponse:
@@ -148,6 +164,9 @@ def find_report_and_sid_by_token(report_token: str):
 
 
 def get_report_token_from_order(order: Order) -> str:
+    if getattr(order, "free_report_token", None):
+        return str(order.free_report_token).strip()
+
     try:
         payload = json.loads(order.pg_payload_json or "{}")
     except Exception:
@@ -210,8 +229,12 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
         order = Order(
             order_id=oid,
             sid=sid,
+            free_report_token=report_token.strip(),
             status="PENDING",
+            payment_method=None,
             amount=PREMIUM_PRICE,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
             pg_payload_json=json.dumps(
                 {
                     "stage": "prepare",
@@ -256,7 +279,7 @@ def build_inicis_form(report_token: str, buyer_name: str, buyer_email: str, buye
         "charset": "UTF-8",
         "format": "JSON",
         "payViewType": "overlay",
-        "merchantData": report_token.strip(),
+        "merchantData": oid,
         "offerPeriod": datetime.utcnow().strftime("%Y%m%d-%Y%m%d"),
         "gopaymethod": "",
         "acceptmethod": "centerCd(Y)",
@@ -527,6 +550,7 @@ async def inicis_exit(
 
 @router.post("/api/payments/inicis/return")
 async def inicis_return(
+    request: Request,
     resultCode: Optional[str] = Form(None),
     resultMsg: Optional[str] = Form(None),
     mid: Optional[str] = Form(None),
@@ -538,19 +562,47 @@ async def inicis_return(
     merchantData: Optional[str] = Form(None),
     idc_name: Optional[str] = Form(None),
 ):
+    log_payment_return(
+        "payment.return.enter",
+        current_url=str(request.url),
+        resultCode=resultCode,
+        resultMsg=resultMsg,
+        orderNumber=orderNumber,
+        authUrl=authUrl,
+        merchantData=merchantData,
+        idc_name=idc_name,
+    )
+
     if resultCode != "0000":
+        log_payment_return(
+            "payment.return.fallback_home",
+            reason=(resultCode or "AUTH_FAIL").strip() or "AUTH_FAIL",
+            orderNumber=orderNumber,
+        )
         return RedirectResponse(
             url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code={quote(resultCode or 'AUTH_FAIL')}&msg={quote(resultMsg or '')}",
             status_code=303,
         )
 
     if not all([mid, orderNumber, authToken, authUrl]):
+        log_payment_return(
+            "payment.return.fallback_home",
+            reason="ORDER_ID_MISSING" if not orderNumber else "INVALID_AUTH_RESULT",
+            orderNumber=orderNumber,
+        )
         return RedirectResponse(
             url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=INVALID_AUTH_RESULT",
             status_code=303,
         )
 
     if not is_valid_inicis_auth_url(authUrl, idc_name):
+        log_payment_return(
+            "payment.return.fallback_home",
+            reason="INVALID_AUTH_URL",
+            orderNumber=orderNumber,
+            authUrl=authUrl,
+            idc_name=idc_name,
+        )
         return RedirectResponse(
             url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=INVALID_AUTH_URL",
             status_code=303,
@@ -559,9 +611,20 @@ async def inicis_return(
     db = SessionLocal()
     try:
         order = db.query(Order).filter(Order.order_id == orderNumber).first()
+        log_payment_return(
+            "payment.return.order_lookup",
+            resolved_order_id=(orderNumber or "").strip(),
+            found=bool(order),
+        )
         if not order:
+            reason = "ORDER_NOT_FOUND"
+            log_payment_return(
+                "payment.return.fallback_home",
+                reason=reason,
+                resolved_order_id=(orderNumber or "").strip(),
+            )
             return RedirectResponse(
-                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?mode=fail&code=ORDER_NOT_FOUND",
+                url=build_payment_home_target(reason=reason),
                 status_code=303,
             )
 
@@ -665,41 +728,12 @@ async def inicis_return(
 
         pay_method = get_pay_method(approve_data)
 
-        report_token = (merchantData or "").strip()
-        if not report_token:
-            report_token = (prepared_payload.get("report_token") or "").strip()
-
-        if not report_token:
-            order.status = "FAILED"
-            order.pg_payload_json = json.dumps(
-                {
-                    "stage": "missing_report_token",
-                    "prepared_payload": prepared_payload,
-                    "auth_result": {
-                        "resultCode": resultCode,
-                        "resultMsg": resultMsg,
-                        "mid": mid,
-                        "orderNumber": orderNumber,
-                        "authUrl": authUrl,
-                        "netCancelUrl": netCancelUrl,
-                        "merchantData": merchantData,
-                        "idc_name": idc_name,
-                    },
-                    "approve_result": approve_data,
-                },
-                ensure_ascii=False,
-            )
-            db.commit()
-
-            return RedirectResponse(
-                url=f"{PAYMENT_BASE_URL}/api/payments/inicis/exit?{build_payment_fail_query(mode='fail', code='MISSING_REPORT_TOKEN', free_return_url=free_return_url, free_token=free_token)}",
-                status_code=303,
-            )
-
         # 가상계좌는 "승인성공"이 아니라 "채번성공"일 수 있음
         if is_vbank_pay_method(pay_method):
             order.status = "VBANK_ISSUED"
+            order.payment_method = pay_method
             order.amount = int(approve_data.get("TotPrice") or order.amount or PREMIUM_PRICE)
+            order.updated_at = datetime.utcnow()
             order.pg_payload_json = json.dumps(
                 {
                     "stage": "vbank_issued",
@@ -720,15 +754,24 @@ async def inicis_return(
             )
             db.commit()
 
+            redirect_target = f"{SERVICE_BASE_URL}/payment-pending?orderId={quote(order.order_id)}"
+            log_payment_return(
+                "payment.return.redirect_target",
+                final_redirect_url=redirect_target,
+                reason="PAYMENT_PENDING",
+                order_id=order.order_id,
+            )
             return RedirectResponse(
-                url=f"{SERVICE_BASE_URL}/payment-pending?token={quote(report_token)}&orderId={quote(order.order_id)}",
+                url=redirect_target,
                 status_code=303,
             )
 
         # 카드/즉시결제류만 여기서 PAID 처리
         order.status = "PAID"
+        order.payment_method = pay_method
         order.amount = int(approve_data.get("TotPrice") or order.amount or PREMIUM_PRICE)
         order.paid_at = datetime.utcnow()
+        order.updated_at = datetime.utcnow()
         order.pg_payload_json = json.dumps(
             {
                 "stage": "paid",
@@ -749,11 +792,26 @@ async def inicis_return(
         )
         db.commit()
 
+        redirect_target = build_payment_success_target(order_id=order.order_id)
+        log_payment_return(
+            "payment.return.redirect_target",
+            final_redirect_url=redirect_target,
+            reason="PAYMENT_CONFIRMED",
+            order_id=order.order_id,
+        )
         return RedirectResponse(
-            url=f"{SERVICE_BASE_URL}/premium-survey?token={quote(report_token)}&orderId={quote(order.order_id)}",
+            url=redirect_target,
             status_code=303,
         )
 
+    except Exception as exc:
+        log_payment_return(
+            "payment.return.fallback_home",
+            reason=f"EXCEPTION_{exc.__class__.__name__[:40].upper()}",
+            orderNumber=orderNumber,
+            trace=traceback.format_exc(limit=3),
+        )
+        raise
     finally:
         db.close()
 
@@ -812,12 +870,14 @@ async def inicis_vbank_notify(request: Request):
         # 00 = 채번, 02 = 입금통보
         if p_status == "02":
             order.status = "PAID"
+            order.payment_method = (p_type or order.payment_method or "").strip().upper() or order.payment_method
             if p_amt:
                 try:
                     order.amount = int(p_amt)
                 except Exception:
                     pass
             order.paid_at = datetime.utcnow()
+            order.updated_at = datetime.utcnow()
             order.pg_payload_json = json.dumps(
                 {
                     "stage": "vbank_paid",
@@ -838,6 +898,7 @@ async def inicis_vbank_notify(request: Request):
             },
             ensure_ascii=False,
         )
+        order.updated_at = datetime.utcnow()
         db.commit()
         return PlainTextResponse("OK", status_code=200)
 

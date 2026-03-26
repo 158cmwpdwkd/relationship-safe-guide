@@ -1,0 +1,227 @@
+1. 수정한 파일 목록
+- app/db.py
+- app/main.py
+- app/models.py
+- app/routes_payments.py
+- app/routes_premium.py
+- app/routes_report.py
+- app/schemas.py
+- app/services/interpretation/schemas.py
+- app/services/premium_report.py
+- imweb/imweb free-report.html
+- imweb/imweb payment-fail.html
+- imweb/imweb premium-survey.html
+- imweb/premium_report.html
+- tests/test_premium_order_flow.py
+
+2. 수정한 함수 목록
+- app/db.py
+  - ensure_runtime_schema
+- app/routes_payments.py
+  - get_report_token_from_order
+  - build_inicis_form
+  - inicis_return
+  - inicis_vbank_notify
+- app/routes_premium.py
+  - premium_entry
+  - premium_access_check
+  - submit_paid_survey_route
+  - generate_premium_report
+  - finalize_premium_report
+  - get_premium_report_status
+- app/routes_report.py
+  - _load_free_report_by_token
+  - _load_premium_report_by_token
+  - resolve_free_report_html
+  - resolve_premium_report_html
+  - view_premium_report
+  - view_free_report
+- app/services/premium_report.py
+  - _get_order
+  - _get_paid_survey
+  - _get_premium_report
+  - get_premium_report_by_token
+  - _ensure_premium_report
+  - _load_paid_answers_or_raise
+  - _build_engine_input
+  - resolve_premium_state
+  - build_entry_response
+  - prepare_premium_preview_or_raise
+  - run_premium_pipeline
+  - submit_paid_survey
+
+3. 변경 전 구조 요약
+- free token, sid, order_id, 기존 reports.report_token 이 premium 흐름에서 섞여 있었다.
+- Order는 sid 기준 여러 개 생길 수 있었지만 PaidSurvey/Report는 sid 기준 단일 row였다.
+- premium read/entry 일부 경로는 order_id 없이 sid 기준 추정 조회를 했다.
+- premium-survey 프론트 submit endpoint가 백엔드 라우트와 불일치했다.
+- free report도 `/r/{token}`를 써서 free token과 premium token의 read 경로가 섞여 있었다.
+
+4. 변경 후 구조 요약
+- free report는 기존 `reports` 테이블과 free token으로만 유지한다.
+- premium은 `Order -> PaidSurvey(order_id PK) -> PremiumReport(order_id PK)`로 분리했다.
+- premium source of truth는 `order_id` 하나로 통일했다.
+- premium report read는 `/r/{premium_report_token}`만 사용한다.
+- free report read는 `/report?token=<free_token>`만 사용한다.
+- premium entry/access-check/status/generate는 모두 `orderId/order_id` 기반으로만 동작한다.
+- generate는 같은 order에 대해 idempotent 하게 기존 premium_report_token을 재사용한다.
+
+5. source of truth 를 order_id 로 정한 이유
+- 결제 성공 이후 premium 흐름은 “특정 주문”에 귀속되어야 한다.
+- sid는 무료 설문 세션 식별자라서 같은 사용자가 여러 번 결제할 때 premium 흐름 분리에 적합하지 않다.
+- free token은 무료 리포트 진입용 식별자이지, premium 저장/조회 식별자로 쓰면 충돌이 생긴다.
+- order_id는 결제 단위로 유일하고, 재결제/재시도 상황에서도 각 premium 결과를 독립적으로 분리하기 쉽다.
+
+6. 모델 관계 변경 사항
+- UserSession 1 : N Order
+  - `UserSession.orders`로 수정
+  - 기존 `order uselist=False` 제거
+- Order
+  - `free_report_token`, `payment_method`, `created_at`, `updated_at` 추가
+  - 같은 sid에 여러 order 허용 유지
+- PaidSurvey
+  - 기존 sid 단일 PK 모델을 폐기하고 `paid_surveys_v2` 테이블로 교체
+  - `order_id` PK/FK, `sid`는 보조 FK
+  - order 기준 1:1 보장
+- PremiumReport
+  - 신규 `premium_reports` 테이블 추가
+  - `order_id` PK/FK
+  - `premium_report_token` unique
+  - `/r/{premium_report_token}`로 정확히 1행 조회 가능
+- Report
+  - free report 전용으로 유지
+  - free token은 여기에만 남김
+
+7. 프론트 storage/query 규칙 변경 사항
+- 공통 storage key
+  - `rl_free_report_token`
+  - `rl_active_order_id`
+  - `rl_premium_report_token`
+- premium-survey
+  - URL의 `orderId`를 진실값으로 사용
+  - free token은 access-check 응답이나 storage로만 유지
+  - submit payload에서 free token 제거
+- premium wrapper
+  - 입력 query는 `orderId`
+  - entry 응답의 `premium_report_token`으로만 `/r/{token}` 진입
+- free report wrapper
+  - iframe 대상 경로를 `/r/{free_token}`에서 `/report?token={free_token}`으로 수정
+- free/payment-fail 화면 cleanup 목록에 `rl_active_order_id` 추가
+
+8. API endpoint / payload / response 변경 사항
+
+[결제 성공]
+- redirect
+  - 이전: `/premium-survey?token=<free token>&orderId=<order_id>`
+  - 이후: `/premium-survey?orderId=<order_id>`
+- payment-pending도 `orderId`만 전달
+
+[GET /api/premium/entry]
+- 이전: `token`, optional `order_id`
+- 이후: `orderId`
+- 응답
+  - `state`
+  - `order_id`
+  - `free_report_token`
+  - `premium_report_token`
+  - `report_url`
+
+[GET /api/premium/access-check]
+- 이전: `token + orderId`
+- 이후: `orderId`
+- 응답
+  - `ok`
+  - `state`
+  - `order_id`
+  - `free_report_token`
+  - `premium_report_token`
+
+[POST /api/premium/survey/submit]
+- 이전 프론트는 `/api/survey/paid` 호출
+- 이후 프론트/백엔드 모두 `/api/premium/survey/submit`
+- body
+  - `schema_version`
+  - `order_id`
+  - `answers(q1~q20)`
+- 응답
+  - `order_id`
+  - `free_report_token`
+  - `premium_report_token`
+  - `state`
+
+[POST /api/premium/report/generate]
+- 이전: `report_token + order_id`, preview 성격
+- 이후: `order_id` 중심의 실제 생성 API
+- body
+  - `order_id`
+  - `overwrite`
+- 응답
+  - `premium_report_token`
+  - `report_url`
+  - `status`
+  - `reused_existing`
+
+[GET /api/premium/report/status]
+- 이전: `sid + order_id + report_token`
+- 이후: `order_id`
+
+[GET /r/{token}]
+- 이전: free/premium 혼용
+- 이후: premium_report_token 전용
+
+[GET /report?token=...]
+- free report token 전용
+
+9. 테스트 시나리오별 결과
+- 1. 정상 신규 흐름
+  - 테스트 코드 작성 완료
+  - `tests/test_premium_order_flow.py::test_normal_flow_creates_order_bound_survey_and_premium_report`
+  - 결과: 코드상 설계 충족
+- 2. 같은 sid에서 재결제/재시도
+  - 테스트 코드 작성 완료
+  - `test_same_sid_multiple_orders_do_not_share_paid_survey_or_premium_report`
+  - 결과: order1/order2의 PaidSurvey/PremiumReport 분리되도록 설계
+- 3. endpoint mismatch 제거 확인
+  - 정적 검증 테스트 작성
+  - `test_frontend_uses_refactored_endpoint_and_keys`
+  - 결과: 프론트 submit endpoint를 `/api/premium/survey/submit`로 변경
+- 4. token 혼용 방지 확인
+  - `test_free_token_cannot_open_premium_report_route`
+  - 결과: `/r/{free_token}`은 404, free는 `/report?token=`만 허용하도록 설계
+- 5. idempotency 확인
+  - `test_generate_is_idempotent_per_order`
+  - 결과: 같은 order에 PremiumReport 1행만 유지하도록 설계
+- 6. 잘못된 order_id 접근
+  - 서비스/라우트에서 `ORDER_NOT_FOUND`, `NOT_PAID` 분기 구현
+  - 결과: 명시적 실패 응답 반환 구조 반영
+- 7. 프론트 redirect 확인
+  - premium-survey는 generate 성공 후 `/r/{premium_report_token}`로 이동하도록 수정
+  - 결과: 구조 반영
+
+실행 검증 한계
+- 로컬 가상환경의 Python launcher가 깨져 있어 `pytest` 실제 실행은 완료하지 못했다.
+- `.venv\Scripts\python.exe -m pytest -q` 실행 시 Windows Store Python 경로 오류가 발생했다.
+- 따라서 위 테스트 결과는 코드 반영 기준의 정적/구조 검증이며, 실제 실행은 Python 환경 복구 후 바로 수행해야 한다.
+
+10. 남은 리스크
+- 기존 운영 DB에 이미 존재하는 legacy `paid_surveys` 데이터를 `paid_surveys_v2`로 이관하는 작업은 별도 마이그레이션이 필요하다.
+- `orders`에 신규 컬럼을 runtime `ALTER TABLE`로 보강하도록 넣었지만, 운영 DB 권한/DDL 제약은 배포 전 확인이 필요하다.
+- admin/운영 도구는 아직 `premium_reports`를 직접 보여주지 않는다.
+- premium wrapper는 orderId 기반으로 바뀌었지만, 실제 imweb 페이지 링크가 이 wrapper를 어떤 경로로 쓰는지는 최종 배포 페이지에서 재확인해야 한다.
+
+11. 추후 운영 시 주의점
+- 정책 선택: A. 재결제 허용, order별 결과 완전 분리
+- 선택 이유
+  - 기존 문제의 본질은 재결제 자체가 아니라 식별자 축 혼용이었다.
+  - 운영 중 결제 재시도/중복 결제를 완전히 막으려면 결제 정책 예외 처리가 더 많이 필요하다.
+  - order별 분리를 명확히 해두면 수동 정리 없이도 각 주문을 독립적으로 추적할 수 있다.
+- 배포 전 필수 확인
+  - runtime schema sync가 실제 운영 DB에서 성공하는지
+  - legacy 데이터가 남아 있어도 새 테이블 경로로 정상 동작하는지
+  - imweb 연결 페이지가 `orderId`를 유지하는지
+  - 결제 성공 후 premium-survey, generate, `/r/{premium_report_token}`까지 E2E 수동 확인
+
+- 결론:
+- 직접 원인: premium 데이터가 sid/free token 축에 묶여 있어 다중 order를 분리하지 못한 구조
+- 보조 원인: 프론트/백엔드 endpoint 불일치와 free/premium read 경로 혼용
+- 가장 먼저 검증할 사용자 시나리오: 같은 무료리포트에서 order1 결제 실패 후 order2 결제 성공 -> premium-survey 제출 -> `/r/{premium_report_token}` 진입 -> 다시 order1/order2를 각각 조회해 서로의 PaidSurvey/PremiumReport가 섞이지 않는지 확인

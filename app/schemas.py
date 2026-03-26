@@ -1,9 +1,10 @@
-# app/schemas.py
-from pydantic import BaseModel, Field
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, Literal, Optional
+
+from pydantic import BaseModel
 
 SchemaVersion = Literal["survey_v1"]
 Stage = Literal["free", "paid"]
+
 
 class Consent(BaseModel):
     privacy_consent: bool
@@ -11,9 +12,11 @@ class Consent(BaseModel):
     ip: Optional[str] = None
     user_agent: Optional[str] = None
 
+
 class Contact(BaseModel):
     phone: str
     email: Optional[str] = None
+
 
 class SurveyIn(BaseModel):
     schema_version: SchemaVersion
@@ -22,6 +25,7 @@ class SurveyIn(BaseModel):
     contact: Contact
     consent: Consent
 
+
 class FreeOut(BaseModel):
     sid: str
     risk_level: str
@@ -29,15 +33,9 @@ class FreeOut(BaseModel):
     report_url: str
     next: Literal["PAY", "HARD_BLOCK"]
 
-class PaidSurveySaveOut(BaseModel):
-    ok: bool
-    sid: str
-    saved: bool
-    next: Literal["GENERATE_REPORT"]
 
 PremiumResolvedState = Literal[
-    "INVALID_REPORT_TOKEN",
-    "REPORT_ORDER_MISMATCH",
+    "ORDER_NOT_FOUND",
     "NOT_PAID",
     "NEED_SURVEY",
     "PROCESSING",
@@ -56,8 +54,9 @@ PremiumNextAction = Literal[
 class PremiumStateOut(BaseModel):
     state: PremiumResolvedState
     sid: Optional[str] = None
-    order_id: Optional[str] = None
-    report_token: str
+    order_id: str
+    free_report_token: Optional[str] = None
+    premium_report_token: Optional[str] = None
     report_url: Optional[str] = None
     next_action: PremiumNextAction
     next_url: Optional[str] = None
@@ -71,8 +70,9 @@ class PremiumEntryOut(BaseModel):
     ok: bool
     state: PremiumResolvedState
     sid: Optional[str] = None
-    order_id: Optional[str] = None
-    report_token: str
+    order_id: str
+    free_report_token: Optional[str] = None
+    premium_report_token: Optional[str] = None
     next_action: PremiumNextAction
     next_url: Optional[str] = None
     user_message: str
@@ -83,23 +83,30 @@ class SurveySubmitOut(BaseModel):
     ok: bool
     sid: str
     saved: bool
-    next: Literal["OPEN_REPORT", "POLL_STATUS"]
+    next: Literal["GENERATE_REPORT", "OPEN_REPORT"]
     order_id: str
-    report_token: str
+    free_report_token: Optional[str] = None
+    premium_report_token: Optional[str] = None
     state: PremiumResolvedState
     next_action: PremiumNextAction
     next_url: Optional[str] = None
     user_message: str
     report_url: Optional[str] = None
 
+
 class PremiumReportGenerateIn(BaseModel):
     order_id: str
-    report_token: str
+    overwrite: bool = False
 
 
 class PremiumReportGenerateOut(BaseModel):
     ok: bool
     sid: str
+    order_id: str
+    premium_report_token: str
+    report_url: str
+    status: str
+    reused_existing: bool
     prompt: str
     interpretation_result: Dict[str, Any]
     metrics: Dict[str, Any]
@@ -108,14 +115,14 @@ class PremiumReportGenerateOut(BaseModel):
 
 class PremiumReportFinalizeIn(BaseModel):
     order_id: str
-    report_token: str
-    overwrite: bool = True
+    overwrite: bool = False
 
 
 class PremiumReportFinalizeOut(BaseModel):
     ok: bool
     sid: str
-    report_token: str
+    order_id: str
+    premium_report_token: str
     saved: bool
     status: str
     prompt: str
@@ -125,11 +132,13 @@ class PremiumReportFinalizeOut(BaseModel):
     html: str
     meta: Dict[str, Any]
 
+
 class PremiumReportStatusOut(BaseModel):
     ok: bool
     sid: str
-    report_token: str
+    order_id: str
+    premium_report_token: Optional[str] = None
     status: str
     has_html: bool
     has_markdown: bool
-    report_url: str
+    report_url: Optional[str] = None

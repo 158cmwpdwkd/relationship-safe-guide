@@ -523,8 +523,6 @@
     const PAYMENT_LAST_MSG_KEY = "rl_payment_last_msg";
     const RETURN_FROM_PAYMENT_FAIL_KEY = "rl_return_from_payment_fail";
     const FREE_REPORT_RELOAD_DONE_KEY = "rl_free_report_reload_done";
-    const RETURN_FROM_PAYMENT_FAIL_KEY = "rl_return_from_payment_fail";
-    const FREE_REPORT_RELOAD_DONE_KEY = "rl_free_report_reload_done";
 
     const loadingEl   = document.getElementById("rcl-loading");
     const errorEl     = document.getElementById("rcl-error");
@@ -547,47 +545,6 @@
       version: "2026-03-22-free-boot-simplified-v1",
       href: window.location.href
     });
-
-    function handleSingleReloadAfterPaymentFail() {
-      let hasReturnFlag = false;
-      let reloadDone = false;
-      let cameFromPaymentFail = false;
-
-      try {
-        hasReturnFlag = sessionStorage.getItem(RETURN_FROM_PAYMENT_FAIL_KEY) === "1";
-        reloadDone = sessionStorage.getItem(FREE_REPORT_RELOAD_DONE_KEY) === "1";
-      } catch (e) {}
-
-      try {
-        cameFromPaymentFail = (document.referrer || "").indexOf("payment-fail") >= 0;
-      } catch (e) {}
-
-      if (!hasReturnFlag && !cameFromPaymentFail) {
-        return false;
-      }
-
-      debugLog("free.return_from_payment_fail.flag_detected", {
-        hasReturnFlag: hasReturnFlag,
-        cameFromPaymentFail: cameFromPaymentFail,
-        reloadDone: reloadDone
-      });
-
-      if (reloadDone) {
-        try {
-          sessionStorage.removeItem(RETURN_FROM_PAYMENT_FAIL_KEY);
-          sessionStorage.removeItem(FREE_REPORT_RELOAD_DONE_KEY);
-        } catch (e) {}
-        return false;
-      }
-
-      try {
-        sessionStorage.setItem(FREE_REPORT_RELOAD_DONE_KEY, "1");
-      } catch (e) {}
-
-      debugLog("free.forced_reload_once", { href: window.location.href });
-      window.location.replace(window.location.href);
-      return true;
-    }
 
     function shouldForceReloadAfterPaymentFail() {
       let hasReturnFlag = false;
@@ -790,6 +747,7 @@
       const removedKeys = [];
       const cleanupKeys = [
         PREMIUM_TOKEN_STORAGE_KEY,
+        "rl_active_order_id",
         PAYMENT_LAST_MODE_KEY,
         PAYMENT_LAST_CODE_KEY,
         PAYMENT_LAST_MSG_KEY,
@@ -942,7 +900,7 @@
       removePaymentFailArtifacts();
 
       frameEl.classList.remove("loaded");
-      frameEl.src = API_BASE + "/r/" + encodeURIComponent(renderToken) + "?v=" + Date.now();
+      frameEl.src = API_BASE + "/report?token=" + encodeURIComponent(renderToken) + "&v=" + Date.now();
 
       if (frameLoadFallbackTimer) {
         clearTimeout(frameLoadFallbackTimer);
@@ -998,9 +956,7 @@
     }
 
     if (!shouldForceReloadAfterPaymentFail()) {
-    if (!handleSingleReloadAfterPaymentFail()) {
       bootFreeReport();
-    }
     }
 
     let rclLastHeight = 0;

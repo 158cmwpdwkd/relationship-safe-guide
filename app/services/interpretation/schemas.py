@@ -22,7 +22,7 @@ class InterpretationBaseModel(BaseModel):
 # Paid survey input
 # --------------------------------------------------
 
-InterpretationSchemaVersion = Literal["paid_survey_v1"]
+InterpretationSchemaVersion = Literal["paid_survey_v1", "paid_survey_v2_20q"]
 
 
 class PaidSurveyAnswers(InterpretationBaseModel):
@@ -70,8 +70,6 @@ class PaidSurveyRequest(InterpretationBaseModel):
     schema_version: InterpretationSchemaVersion = "paid_survey_v1"
 
     order_id: str = Field(..., min_length=1, max_length=64)
-    report_token: str = Field(..., min_length=1, max_length=128)
-
     answers: PaidSurveyAnswers
 
     submitted_at: Optional[datetime] = None

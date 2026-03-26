@@ -1,0 +1,74 @@
+1. 수정한 파일 목록
+- app/routes_payments.py
+- imweb/imweb premium-survey.html
+
+2. 수정한 함수 목록
+- app/routes_payments.py
+  - log_payment_return()
+  - build_payment_success_target()
+  - build_payment_home_target()
+  - inicis_return()
+- imweb/imweb premium-survey.html
+  - getOrderId()
+
+3. 홈으로 떨어지던 직접 원인
+- 결제 성공 callback 함수 `inicis_return()` 안에 refactor 이전 `report_token` 필수 검증이 남아 있었다.
+- 현재 구조에서는 premium 후속 흐름의 source of truth가 `order_id`인데도, 승인 완료 후 다시 `merchantData/free token/report token`을 복원하려고 했다.
+- 이 값이 비거나 기대값과 다르면 성공 결제여도 `MISSING_REPORT_TOKEN` 실패 흐름으로 빠질 수 있었다.
+- premium-survey 프론트는 `orderId`가 없거나 access-check가 실패하면 바로 `goHome()`을 실행하므로, redirect query가 조금만 틀어져도 사용자 체감상 "결제 후 홈으로 이동"으로 보였다.
+
+4. 결제 성공 시 최종 redirect 생성 규칙
+- 카드/즉시결제 승인 성공:
+  - `orderNumber`로 `Order` 조회
+  - `Order.status = PAID`
+  - 최종 redirect = `/premium-survey?orderId=<order_id>`
+- 가상계좌 채번 성공:
+  - `Order.status = VBANK_ISSUED`
+  - 최종 redirect = `/payment-pending?orderId=<order_id>`
+- 성공 redirect 생성에는 더 이상 free token/report token을 사용하지 않는다.
+- `merchantData`는 이제 success redirect 진실값이 아니라 참고용 승인 원문 데이터로만 남는다.
+
+5. 추가한 로그 목록
+- `payment.return.enter`
+  - current url
+  - resultCode
+  - resultMsg
+  - orderNumber
+  - authUrl
+  - merchantData
+  - idc_name
+- `payment.return.order_lookup`
+  - resolved_order_id
+  - found
+- `payment.return.redirect_target`
+  - final_redirect_url
+  - reason
+  - order_id
+- `payment.return.fallback_home`
+  - reason
+  - orderNumber 또는 resolved_order_id
+  - 예외 시 trace 일부
+
+6. 테스트 시나리오별 결과
+- 카드 결제 성공
+  - 코드상 최종 redirect는 `/premium-survey?orderId=<order_id>`로 고정되도록 수정했다.
+  - 성공 분기에서 legacy `report_token` 검증을 제거했기 때문에, 결제 성공이 `MISSING_REPORT_TOKEN`로 꺾이는 경로는 제거됐다.
+- 존재하지 않는 order
+  - `payment.return.order_lookup` 로그 후 `payment.return.fallback_home`에 `ORDER_NOT_FOUND`가 남는다.
+  - 최종 redirect는 홈(`/?payment_reason=ORDER_NOT_FOUND`)으로 보낸다.
+- 결제 실패/취소
+  - 기존 fail/cancel redirect는 유지된다.
+  - success redirect와 분리되고, 초기 진입 로그에 실패 코드가 남는다.
+- premium-survey 진입
+  - `orderId` 우선, `order_id` 보조 허용으로 query key mismatch 한 번은 흡수한다.
+  - 그래도 `orderId`가 없거나 access-check가 실패하면 홈으로 가는 기존 방어 로직은 유지된다.
+
+7. 남은 리스크
+- `resultCode != 0000`, `INVALID_AUTH_RESULT`, `INVALID_AUTH_URL`은 현재 fail page로 보내며, 이 경로는 홈 fallback이 아니라 결제 실패 화면 경로다. 운영 로그에서 success/fail을 함께 확인해야 한다.
+- premium-survey는 access-check 실패 시 여전히 홈으로 보낸다. 사용자 메시지 개선은 이번 작업 범위 밖이라 최소 수정만 했다.
+- 실제 이니시스 callback 실기 테스트는 아직 필요하다. 로컬에서 결제망 호출/pytest 자동 검증은 수행하지 못했다.
+
+- 결론: 결제 성공 후 홈으로 보이던 핵심 원인은 `inicis_return()` 성공 분기에 남아 있던 legacy report token 의존과, premium-survey의 엄격한 `orderId` 검증이 겹친 것이었다. 성공 redirect를 `orderId` 단일 축으로 고정해 복구했다.
+- 직접 원인: `inicis_return()`가 결제 승인 후에도 `report_token` 복원을 요구하던 성공 분기 로직.
+- 보조 원인: premium-survey가 `orderId` 누락 또는 access-check 실패 시 즉시 홈으로 보내는 프론트 진입 검증.
+- 가장 먼저 다시 테스트할 URL: `https://reconnectlab.co.kr/premium-survey?orderId=<실제_결제성공_order_id>`

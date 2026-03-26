@@ -1,20 +1,19 @@
 import os
-import asyncpg
 
+import asyncpg
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from dotenv import load_dotenv
-load_dotenv()
-
-from app.routes_survey import router as survey_router
-from app.routes_report import router as report_router
+from app.db import ensure_runtime_schema
+from app.models import MessageSchedule, Order, PaidSurvey, PremiumReport, Report, UserSession
 from app.routes_admin import router as admin_router
 from app.routes_payments import router as payments_router
 from app.routes_premium import router as premium_router
+from app.routes_report import router as report_router
+from app.routes_survey import router as survey_router
 
-from app.db import engine, Base
-from app.models import UserSession, Order, PaidSurvey, Report, MessageSchedule
+load_dotenv()
 
 app = FastAPI()
 
@@ -31,12 +30,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 async def startup():
-    # 1) SQLAlchemy 테이블 생성
-    Base.metadata.create_all(bind=engine)
+    ensure_runtime_schema()
 
-    # 2) asyncpg pool 생성
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise RuntimeError("DATABASE_URL is not set")
@@ -48,11 +46,13 @@ async def startup():
         ssl="require",
     )
 
+
 @app.on_event("shutdown")
 async def shutdown():
     pool = getattr(app.state, "db_pool", None)
     if pool:
         await pool.close()
+
 
 app.include_router(survey_router)
 app.include_router(report_router)
