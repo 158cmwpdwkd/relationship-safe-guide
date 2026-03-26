@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
@@ -16,6 +17,16 @@ from app.services.reporting.premium_pipeline import (
 )
 
 PAYMENT_FAIL_PATH = "/payment-fail"
+PUBLIC_SITE_URL = (os.getenv("PUBLIC_SITE_URL") or os.getenv("SERVICE_BASE_URL") or "https://reconnectlab.co.kr").strip().rstrip("/")
+PREMIUM_PUBLIC_PATH = (os.getenv("PREMIUM_PUBLIC_PATH") or "/premium").strip()
+
+
+def build_public_premium_report_url(*, premium_report_token: str) -> str:
+    token = (premium_report_token or "").strip()
+    if not token:
+        return ""
+    path = PREMIUM_PUBLIC_PATH if PREMIUM_PUBLIC_PATH.startswith("/") else f"/{PREMIUM_PUBLIC_PATH}"
+    return f"{PUBLIC_SITE_URL}{path}?token={token}"
 
 
 def _premium_token() -> str:
@@ -151,9 +162,13 @@ def resolve_premium_state(*, order_id: str, db: Session) -> PremiumStateOut:
             order_id=order.order_id,
             free_report_token=order.free_report_token,
             premium_report_token=premium_report.premium_report_token,
-            report_url=f"/r/{premium_report.premium_report_token}",
+            report_url=build_public_premium_report_url(
+                premium_report_token=premium_report.premium_report_token,
+            ),
             next_action="OPEN_REPORT",
-            next_url=f"/r/{premium_report.premium_report_token}",
+            next_url=build_public_premium_report_url(
+                premium_report_token=premium_report.premium_report_token,
+            ),
             user_message="프리미엄 리포트가 준비되었습니다.",
             has_paid_survey=True,
             has_report_html=True,
@@ -167,7 +182,9 @@ def resolve_premium_state(*, order_id: str, db: Session) -> PremiumStateOut:
         free_report_token=order.free_report_token,
         premium_report_token=(premium_report.premium_report_token if premium_report else None),
         report_url=(
-            f"/r/{premium_report.premium_report_token}"
+            build_public_premium_report_url(
+                premium_report_token=premium_report.premium_report_token,
+            )
             if premium_report and premium_report.premium_report_token
             else None
         ),

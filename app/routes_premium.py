@@ -14,6 +14,7 @@ from .schemas import (
 from .services.interpretation.schemas import PaidSurveyRequest
 from .services.premium_report import (
     build_entry_response,
+    build_public_premium_report_url,
     resolve_premium_state,
     run_premium_pipeline,
     submit_paid_survey,
@@ -93,12 +94,16 @@ def generate_premium_report(
         overwrite=payload.overwrite,
     )
 
+    public_report_url = build_public_premium_report_url(
+        premium_report_token=premium_report.premium_report_token,
+    )
+
     return PremiumReportGenerateOut(
         ok=True,
         sid=state.sid or "",
         order_id=payload.order_id,
         premium_report_token=premium_report.premium_report_token,
-        report_url=f"/r/{premium_report.premium_report_token}",
+        report_url=public_report_url,
         status=premium_report.status,
         reused_existing=reused_existing,
         prompt=preview["prompt"],
@@ -106,7 +111,7 @@ def generate_premium_report(
         metrics=preview["metrics"],
         meta={
             **preview["meta"],
-            "report_url": f"/r/{premium_report.premium_report_token}",
+            "report_url": public_report_url,
             **({"reused_existing": True} if reused_existing else {}),
         },
     )
@@ -124,6 +129,10 @@ def finalize_premium_report(
         overwrite=payload.overwrite,
     )
 
+    public_report_url = build_public_premium_report_url(
+        premium_report_token=premium_report.premium_report_token,
+    )
+
     return PremiumReportFinalizeOut(
         ok=True,
         sid=state.sid or "",
@@ -138,7 +147,7 @@ def finalize_premium_report(
         html=premium_report.html,
         meta={
             **preview["meta"],
-            "report_url": f"/r/{premium_report.premium_report_token}",
+            "report_url": public_report_url,
             **({"reused_existing": True} if reused_existing else {}),
         },
     )

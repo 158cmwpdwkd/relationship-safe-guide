@@ -1125,6 +1125,7 @@
 <script>
 (function () {
   const API_BASE = "https://relationship-safe-guide-api.onrender.com";
+  const PUBLIC_SITE_URL = "https://reconnectlab.co.kr";
   const ACCESS_CHECK_ENDPOINT = API_BASE + "/api/premium/access-check";
   const PAID_ENDPOINT = API_BASE + "/api/premium/survey/submit";
   const GENERATE_ENDPOINT = API_BASE + "/api/premium/report/generate";
@@ -1209,6 +1210,10 @@
     const qs = new URLSearchParams();
     if (ORDER_ID) qs.set("orderId", ORDER_ID);
     window.location.href = "https://reconnectlab.co.kr/payment-pending" + (qs.toString() ? ("?" + qs.toString()) : "");
+  }
+
+  function buildPremiumWrapperUrl(token) {
+    return PUBLIC_SITE_URL.replace(/\/$/, "") + "/premium?token=" + encodeURIComponent(token);
   }
 
   function setMsg(text, ok) {
@@ -1470,7 +1475,7 @@
       }
 
       writeStorage(PREMIUM_REPORT_TOKEN_STORAGE_KEY, generateData.premium_report_token);
-      window.location.href = API_BASE + "/r/" + encodeURIComponent(generateData.premium_report_token);
+      window.location.href = generateData.report_url || buildPremiumWrapperUrl(generateData.premium_report_token);
 
     } catch (err) {
       setMsg(err.message || "제출 중 오류가 발생했습니다.");
@@ -1557,7 +1562,7 @@
           writeStorage(PREMIUM_REPORT_TOKEN_STORAGE_KEY, data.premium_report_token);
         }
         if (data.state === "READY" && data.premium_report_token) {
-          window.location.replace(API_BASE + "/r/" + encodeURIComponent(data.premium_report_token));
+          window.location.replace(data.report_url || buildPremiumWrapperUrl(data.premium_report_token));
           return false;
         }
         return true;
