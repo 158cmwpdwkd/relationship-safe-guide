@@ -1,0 +1,97 @@
+1. 수정한 파일 목록
+- app/routes_payments.py
+
+2. 수정한 함수 목록
+- build_payment_fail_query()
+- build_payment_fail_target()
+- log_payment_mobile_fail()
+- build_mobile_cancel_target()
+- approve_mobile_payment()
+- pay_start_page()
+- inicis_prepare()
+- inicis_mobile_next()
+- inicis_mobile_return()
+- inicis_mobile_cancel()
+
+3. mobile.inicis.com 까지는 갔다는 사실을 기준으로 추론한 현재 단계
+- `mobile.inicis.com`으로 잠깐 이동했다는 것은 `payment.mobile.prepare`까지는 정상이다.
+- 따라서 현재 실제 실패 지점은 아래 셋 중 하나로 좁혀진다.
+  - `mobile/next` 자체가 호출되지 않음
+  - `mobile/next`는 호출됐지만 `P_STATUS/P_OID/P_REQ_URL` 해석에서 실패
+  - `P_REQ_URL` 승인 요청 또는 승인 응답 파싱에서 실패
+- 이번 수정은 이 세 구간을 `stage=next|approve|cancel|return`과 `reason=`으로 분리해서 바로 식별 가능하게 만든 것이다.
+
+4. payment.mobile.next.enter 실제 raw 수신값 요약
+- 이번 환경에서는 실휴대폰 호출 원문을 아직 수집하지 못했다.
+- 대신 이제 다음 값이 로그에 그대로 남는다.
+  - `raw_form`
+  - `parsed_keys`
+  - `P_OID`
+  - `P_STATUS`
+  - `P_TID`
+  - `P_REQ_URL`
+  - `P_RMESG1`
+  - `referrer`
+  - `user-agent`
+- 따라서 다음 실기 테스트 1회만으로 `mobile/next` 진입 여부와 실제 key 이름을 확인할 수 있다.
+
+5. approve 요청/응답 raw 요약
+- `payment.mobile.approve.request`
+  - `order_id`
+  - `req_url`
+  - `outgoing_payload_keys`
+  - `tid`
+- `payment.mobile.approve.result`
+  - `raw_response_text`
+  - `parsed_response_dict`
+  - `success_basis`
+  - `chosen_reason_code`
+- 승인 응답이 비정상일 때는 이제 아래 reason으로 분리된다.
+  - `MOBILE_APPROVE_HTTP_ERROR`
+  - `MOBILE_APPROVE_PARSE_FAILED`
+  - `MOBILE_APPROVE_NOT_PAID`
+
+6. 최종 fail reason code
+- 이번 수정 후 payment-fail URL에는 반드시 아래가 붙는다.
+  - `mode=fail` 또는 `mode=cancel`
+  - `reason=<short_reason_code>`
+  - `orderId=<if available>`
+  - `stage=<next|approve|return|cancel>`
+- 현재 코드상 대표 reason
+  - `MOBILE_ORDER_ID_MISSING`
+  - `MOBILE_ORDER_NOT_FOUND`
+  - `MOBILE_STATUS_NOT_SUCCESS`
+  - `MOBILE_REQ_URL_MISSING`
+  - `MOBILE_APPROVE_HTTP_ERROR`
+  - `MOBILE_APPROVE_PARSE_FAILED`
+  - `MOBILE_APPROVE_NOT_PAID`
+  - `MOBILE_RETURN_PENDING`
+  - `MOBILE_CANCEL`
+  - `MOBILE_UNEXPECTED_RESPONSE`
+
+7. 직접 원인
+- 아직 실기 raw payload가 없어서 실제 단일 원인을 확정할 수는 없다.
+- 다만 기존 코드의 직접 문제는 모바일 실패가 모두 느슨한 fail/cancel 처리로 뭉개져서, `next` 미호출인지 `approve` 실패인지 구분이 안 됐던 점이다.
+
+8. 보조 원인
+- payment-fail URL에 `reason/stage/orderId`가 없어 브라우저 주소만 보고는 실패 단계를 알 수 없었다.
+- 승인 응답도 raw text와 success 판단 근거가 남지 않아, parser 문제와 실제 PG 실패를 구분하기 어려웠다.
+
+9. 어떤 한 줄 수정/보강으로 해결됐는지
+- 핵심 보강은 모바일 fail redirect를 `build_mobile_cancel_target(... reason=<code>, stage=<stage>, orderId=<id>)` 형태로 통일한 것이다.
+- 여기에 `payment.mobile.fail` 로그를 별도로 추가해서, 실제 휴대폰 테스트 후 한 번의 URL/로그 확인만으로 root cause를 좁힐 수 있게 만들었다.
+
+10. 다시 테스트할 체크리스트
+- 휴대폰에서 premium 결제 버튼 클릭
+- `payment.mobile.prepare` 로그 확인
+- `payment.mobile.next.enter` 로그가 찍히는지 확인
+- payment-fail로 떨어지면 URL의 `reason`, `stage`, `orderId` 확인
+- 서버 로그에서 `payment.mobile.fail` 확인
+- `approve.request`가 없다면 `next` 단계 문제
+- `approve.request`는 있고 `approve.result`가 실패면 승인 응답/파서 문제
+- `approve.result`는 성공인데도 fail이면 redirect stage 로그 확인
+
+- 결론: 이번 수정은 모바일 PG 값을 추측으로 더 바꾸지 않고, 실제 실패 지점을 `next/approve/cancel/return` 단계와 reason code로 분리해 root cause를 바로 드러내는 쪽에 집중했다.
+- 직접 원인: 기존 모바일 fail 흐름이 단계별 reason 없이 payment-fail로 뭉개져, 실제 실패 지점을 식별할 수 없었던 점.
+- 보조 원인: 승인 응답 raw text와 success 판단 기준이 로그에 남지 않아 parser 문제와 실제 PG 실패를 구분하지 못했던 점.
+- 다음 모바일 테스트 때 가장 먼저 볼 로그: `payment.mobile.next.enter`
