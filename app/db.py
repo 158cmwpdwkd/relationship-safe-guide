@@ -57,18 +57,36 @@ def ensure_runtime_schema() -> None:
         "created_at": "TIMESTAMP",
         "updated_at": "TIMESTAMP",
     }
+    report_columns = {
+        "free_kakao_sent_at": "TIMESTAMP",
+    }
+    premium_report_columns = {
+        "premium_kakao_sent_at": "TIMESTAMP",
+    }
 
     with engine.begin() as conn:
         inspector = inspect(conn)
         existing_tables = set(inspector.get_table_names())
-        if "orders" not in existing_tables:
-            return
+        if "orders" in existing_tables:
+            existing_columns = {col["name"] for col in inspector.get_columns("orders")}
+            for column_name, column_type in order_columns.items():
+                if column_name in existing_columns:
+                    continue
+                conn.execute(text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}"))
 
-        existing_columns = {col["name"] for col in inspector.get_columns("orders")}
-        for column_name, column_type in order_columns.items():
-            if column_name in existing_columns:
-                continue
-            conn.execute(text(f"ALTER TABLE orders ADD COLUMN {column_name} {column_type}"))
+        if "reports" in existing_tables:
+            existing_columns = {col["name"] for col in inspector.get_columns("reports")}
+            for column_name, column_type in report_columns.items():
+                if column_name in existing_columns:
+                    continue
+                conn.execute(text(f"ALTER TABLE reports ADD COLUMN {column_name} {column_type}"))
+
+        if "premium_reports" in existing_tables:
+            existing_columns = {col["name"] for col in inspector.get_columns("premium_reports")}
+            for column_name, column_type in premium_report_columns.items():
+                if column_name in existing_columns:
+                    continue
+                conn.execute(text(f"ALTER TABLE premium_reports ADD COLUMN {column_name} {column_type}"))
 
 def get_db():
     db = SessionLocal()

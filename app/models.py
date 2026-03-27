@@ -86,6 +86,7 @@ class Report(Base):
     report_token: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    free_kakao_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     session = relationship("UserSession", back_populates="free_report")
 
@@ -110,6 +111,7 @@ class PremiumReport(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    premium_kakao_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     order = relationship("Order", back_populates="premium_report")
     session = relationship("UserSession", back_populates="premium_reports")

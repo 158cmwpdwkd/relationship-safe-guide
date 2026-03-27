@@ -1,0 +1,38 @@
+1. 수정 파일
+- `app/services/kakao_alert.py`
+- `app/routes_report.py`
+- `app/routes_premium.py`
+- `app/models.py`
+- `app/db.py`
+
+2. 발송 트리거 위치
+- 무료: `app/routes_report.py`의 `resolve_free_report_html()`에서 free report token으로 리포트를 해석한 직후
+- 프리미엄: `app/routes_premium.py`의 `/api/premium/report/generate`와 `/api/premium/report/finalize`에서 `run_premium_pipeline()` 완료 후, `premium_report.status == "READY"` 확인 직후
+- 프리미엄은 결제 직후가 아니라 리포트 생성 완료 시점에만 발송된다.
+
+3. 중복 방지 방식
+- `Report.free_kakao_sent_at`
+- `PremiumReport.premium_kakao_sent_at`
+- 발송 전 각각 `is null`인지 확인한다.
+- 발송 성공 시에만 현재 UTC 시각을 저장한다.
+- 새로고침, generate/finalize 재호출, 기존 READY 리포트 재조회 시에는 `kakao.alert.skip.already_sent` 로그만 남기고 재발송하지 않는다.
+- 기존 배포 DB에서도 동작하도록 `app/db.py`의 runtime schema sync에 신규 컬럼 추가만 최소 보강했다.
+
+4. 테스트 결과
+- 정적 코드 기준 확인:
+- 무료는 phone 존재 + `free_kakao_sent_at is null`일 때만 발송 시도한다.
+- 무료 리포트 페이지 새로고침 시 `free_kakao_sent_at`가 이미 저장되어 있으면 재발송하지 않는다.
+- 프리미엄은 `premium_report.status == "READY"` + phone 존재 + `premium_kakao_sent_at is null`일 때만 발송 시도한다.
+- 프리미엄 generate/finalize 재호출 시 이미 `premium_kakao_sent_at`가 있으면 재발송하지 않는다.
+- `send_kakao_alert()`는 env 누락, 전화번호 불일치, HTTP 실패, API 4xx/5xx에서 예외를 올리지 않고 `False`를 반환한다.
+- 실제 외부 카카오 API 호출 테스트는 이 환경에서 미실행이다.
+
+5. 남은 리스크
+- 무료 발송은 지정된 수정 범위를 지키기 위해 `routes_report.py`의 무료 리포트 해석 시점에 붙였다. 따라서 무료 리포트 저장 직후가 아니라 첫 리포트 접근 시점이 실제 발송 시점이다.
+- 카카오 공급사 API의 실제 요청 스펙이 현재 가정한 `senderKey/templateCode/to/variables` 구조와 다르면 env가 맞아도 발송 실패할 수 있다.
+- `KAKAO_ALERT_FREE_TEMPLATE_CODE`, `KAKAO_ALERT_PREMIUM_TEMPLATE_CODE`, `KAKAO_ALERT_API_URL`, `KAKAO_ALERT_API_KEY`, `KAKAO_ALERT_SENDER_KEY`가 비어 있으면 조용히 실패하고 서비스 흐름은 그대로 유지된다.
+- 전화번호는 `010XXXXXXXX`만 허용하도록 정규화했기 때문에 다른 형식 번호는 발송 대상에서 제외된다.
+
+- 결론:
+- 실제 발송 시점: 무료는 첫 free report 해석 시점, 프리미엄은 generate/finalize에서 READY 확정 직후
+- 중복 방지 방식: `free_kakao_sent_at` / `premium_kakao_sent_at` null 체크 후 성공 시각 저장

@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
@@ -10,6 +12,13 @@ from .services.reporting.premium_renderer import (
 )
 
 router = APIRouter()
+
+
+def log_kakao_alert(event: str, **payload) -> None:
+    try:
+        print(f"{event} {json.dumps(payload, ensure_ascii=False, default=str)}")
+    except Exception:
+        print(f"{event} {payload}")
 
 
 def _load_free_report_by_token(*, token: str, db):
@@ -38,7 +47,15 @@ def _load_premium_report_by_token(*, token: str, db) -> PremiumReport:
 def resolve_free_report_html(token: str) -> HTMLResponse:
     db = SessionLocal()
     try:
-        _, session = _load_free_report_by_token(token=token, db=db)
+        report, session = _load_free_report_by_token(token=token, db=db)
+        if report.free_kakao_sent_at is not None:
+            log_kakao_alert(
+                "kakao.alert.skip.already_sent",
+                alert_type="free",
+                sid=report.sid,
+                report_token=report.report_token,
+                sent_at=report.free_kakao_sent_at,
+            )
         return HTMLResponse(
             make_report_html(
                 risk_level=session.risk_level,

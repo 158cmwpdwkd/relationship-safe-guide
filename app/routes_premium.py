@@ -1,7 +1,12 @@
+import json
+import os
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from .db import SessionLocal
+from .models import UserSession
 from .schemas import (
     PremiumEntryOut,
     PremiumReportFinalizeIn,
@@ -19,8 +24,11 @@ from .services.premium_report import (
     run_premium_pipeline,
     submit_paid_survey,
 )
+from .services.kakao_alert import normalize_phone, send_kakao_alert
 
 router = APIRouter(prefix="/api/premium", tags=["premium"])
+PREMIUM_REPORT_PUBLIC_BASE_URL = "https://reconnectlab.co.kr"
+KAKAO_ALERT_PREMIUM_TEMPLATE_CODE = (os.getenv("KAKAO_ALERT_PREMIUM_TEMPLATE_CODE") or "").strip()
 
 
 def get_db():
@@ -29,6 +37,75 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def log_kakao_alert(event: str, **payload) -> None:
+    try:
+        print(f"{event} {json.dumps(payload, ensure_ascii=False, default=str)}")
+    except Exception:
+        print(f"{event} {payload}")
+
+
+def _build_premium_report_kakao_url(*, token: str) -> str:
+    return f"{PREMIUM_REPORT_PUBLIC_BASE_URL}/premium?token={token}"
+
+
+def _send_premium_report_kakao_alert(*, premium_report, db: Session) -> None:
+    if premium_report.status != "READY":
+        return
+
+    session = db.query(UserSession).filter(UserSession.sid == premium_report.sid).first()
+    if not session:
+        log_kakao_alert(
+            "kakao.alert.fail",
+            alert_type="premium",
+            order_id=premium_report.order_id,
+            premium_report_token=premium_report.premium_report_token,
+            reason="SESSION_NOT_FOUND",
+        )
+        return
+
+    phone = normalize_phone(session.phone)
+    if not phone:
+        return
+    if premium_report.premium_kakao_sent_at is not None:
+        log_kakao_alert(
+            "kakao.alert.skip.already_sent",
+            alert_type="premium",
+            order_id=premium_report.order_id,
+            premium_report_token=premium_report.premium_report_token,
+            sent_at=premium_report.premium_kakao_sent_at,
+        )
+        return
+
+    report_url = _build_premium_report_kakao_url(token=premium_report.premium_report_token)
+    sent = send_kakao_alert(
+        phone=phone,
+        template_code=KAKAO_ALERT_PREMIUM_TEMPLATE_CODE,
+        variables={
+            "report_url": report_url,
+            "token": premium_report.premium_report_token,
+        },
+    )
+    if not sent:
+        log_kakao_alert(
+            "kakao.alert.fail",
+            alert_type="premium",
+            order_id=premium_report.order_id,
+            premium_report_token=premium_report.premium_report_token,
+            phone=phone,
+        )
+        return
+
+    premium_report.premium_kakao_sent_at = datetime.utcnow()
+    db.commit()
+    log_kakao_alert(
+        "kakao.alert.premium.send",
+        order_id=premium_report.order_id,
+        premium_report_token=premium_report.premium_report_token,
+        phone=phone,
+        report_url=report_url,
+    )
 
 
 def _raise_for_blocking_state(*, order_id: str, db: Session):
@@ -97,6 +174,7 @@ def generate_premium_report(
     public_report_url = build_public_premium_report_url(
         premium_report_token=premium_report.premium_report_token,
     )
+    _send_premium_report_kakao_alert(premium_report=premium_report, db=db)
 
     return PremiumReportGenerateOut(
         ok=True,
@@ -132,6 +210,7 @@ def finalize_premium_report(
     public_report_url = build_public_premium_report_url(
         premium_report_token=premium_report.premium_report_token,
     )
+    _send_premium_report_kakao_alert(premium_report=premium_report, db=db)
 
     return PremiumReportFinalizeOut(
         ok=True,

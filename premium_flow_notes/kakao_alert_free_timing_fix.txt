@@ -1,0 +1,25 @@
+1. 수정 위치
+- `app/routes_survey.py`
+- `app/routes_report.py`
+
+2. 기존 vs 변경 타이밍 비교
+- 기존: `app/routes_report.py`의 `resolve_free_report_html()`에서 무료 리포트 첫 조회 시 발송
+- 변경: `app/routes_survey.py`의 `submit_free()`에서 free token 생성 완료 + DB 저장 완료 직후 발송
+- 따라서 사용자가 리포트를 열지 않아도 무료 설문 완료 직후 발송 시도가 된다.
+
+3. 중복 방지 유지 확인
+- 기존 `Report.free_kakao_sent_at` 기반 중복 방지 로직은 유지했다.
+- 발송 조건은 그대로 `phone 존재` + `free_kakao_sent_at is null`이다.
+- 발송 성공 시에만 `free_kakao_sent_at = now()`를 저장한다.
+- `resolve_free_report_html()`에서는 실제 발송을 제거했고, 이미 발송된 건만 `kakao.alert.skip.already_sent` 로그를 남긴다.
+- 리포트 여러 번 조회해도 추가 발송은 없다.
+
+4. 테스트 결과
+- 정적 코드 기준 확인:
+- 무료 설문 완료 후 `submit_free()` 내부에서 `db.commit()` 뒤 `_send_free_report_kakao_alert()`가 호출된다.
+- 무료 리포트 미조회 상태여도 발송 경로는 이미 실행된다.
+- 무료 리포트 조회 라우트에서는 발송 함수 호출이 제거되어 추가 발송이 발생하지 않는다.
+- 실제 외부 카카오 API 호출 테스트는 이 환경에서 미실행이다.
+
+- 결론:
+- 변경된 실제 발송 시점: 무료 설문 제출 후 free report token 생성 및 DB 저장이 끝난 직후
