@@ -32,6 +32,11 @@ MOBILE_PAYMENT_URL = "https://mobile.inicis.com/smart/payment/"
 
 PREMIUM_PRICE = int(os.getenv("PREMIUM_PRICE") or "29000")
 PREMIUM_GOODNAME = (os.getenv("PREMIUM_GOODNAME") or "리커넥트랩 프리미엄 AI 리포트").strip()
+INICIS_MOBILE_CHARSET = "utf8"
+INICIS_MOBILE_HTML_CHARSET = "UTF-8" if INICIS_MOBILE_CHARSET.lower() == "utf8" else INICIS_MOBILE_CHARSET
+INICIS_MOBILE_ASCII_SAFE_TEXT = (os.getenv("INICIS_MOBILE_ASCII_SAFE_TEXT") or "true").strip().lower() in {"1", "true", "yes", "on"}
+INICIS_MOBILE_ASCII_GOODS_NAME = "ReconnectLab Premium Report"
+INICIS_MOBILE_ASCII_BUYER_NAME = "customer"
 
 
 class PreparePaymentIn(BaseModel):
@@ -182,6 +187,35 @@ def make_mobile_hash(*, amount: str, order_id: str, timestamp: str, mobile_hash_
     raw = f"{(amount or '').strip()}{(order_id or '').strip()}{(timestamp or '').strip()}{(mobile_hash_key or '').strip()}"
     digest = hashlib.sha512(raw.encode("utf-8")).digest()
     return base64.b64encode(digest).decode("ascii")
+
+
+def contains_non_ascii(value: str) -> bool:
+    return any(ord(char) > 127 for char in str(value or ""))
+
+
+def resolve_premium_goodname() -> tuple[str, str]:
+    env_value = (os.getenv("PREMIUM_GOODNAME") or "").strip()
+    if env_value:
+        return env_value, "env"
+    return PREMIUM_GOODNAME, "default"
+
+
+def normalize_mobile_goods_name(raw_name: str) -> str:
+    text = (raw_name or "").strip()
+    if not text:
+        text = PREMIUM_GOODNAME
+    if INICIS_MOBILE_ASCII_SAFE_TEXT:
+        return INICIS_MOBILE_ASCII_GOODS_NAME
+    return text
+
+
+def normalize_mobile_buyer_name(raw_name: str) -> str:
+    text = (raw_name or "").strip()
+    if not text:
+        text = "고객"
+    if INICIS_MOBILE_ASCII_SAFE_TEXT:
+        return INICIS_MOBILE_ASCII_BUYER_NAME
+    return text
 
 
 def create_pending_order(
@@ -452,6 +486,11 @@ def build_mobile_payment_form(
         )
         raise HTTPException(status_code=500, detail="MOBILE_HASH_KEY_MISSING")
 
+    goods_raw, goods_source = resolve_premium_goodname()
+    uname_raw = (buyer_name or "").strip() or "고객"
+    goods_final = normalize_mobile_goods_name(goods_raw)
+    uname_final = normalize_mobile_buyer_name(uname_raw)
+
     context = create_pending_order(
         report_token=report_token,
         buyer_name=buyer_name,
@@ -483,26 +522,30 @@ def build_mobile_payment_form(
         "P_MID": INICIS_MID,
         "P_OID": order_id,
         "P_AMT": amount,
-        "P_GOODS": PREMIUM_GOODNAME,
-        "P_UNAME": buyer_name,
+        "P_GOODS": goods_final,
+        "P_UNAME": uname_final,
         "P_MOBILE": buyer_tel,
         "P_EMAIL": buyer_email,
         "P_NEXT_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/next",
         "P_RETURN_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/return",
         "P_CANCEL_URL": f"{PAYMENT_BASE_URL}/api/payments/inicis/mobile/cancel",
-        "P_CHARSET": "utf8",
+        "P_CHARSET": INICIS_MOBILE_CHARSET,
         "P_INI_PAYMENT": "CARD",
         "P_NOTI": order_id,
         "P_RESERVED": reserved_value,
         "P_TIMESTAMP": timestamp,
         "P_CHKFAKE": mobile_hash,
     }
+    form["_RCL_GOODS_RAW"] = goods_raw
+    form["_RCL_GOODS_SOURCE"] = goods_source
+    form["_RCL_UNAME_RAW"] = uname_raw
+    form["_RCL_ASCII_SAFE_MODE"] = INICIS_MOBILE_ASCII_SAFE_TEXT
     return form
 
 
 def _render_hidden_inputs(form: dict) -> str:
     inputs: list[str] = []
-    for key, value in form.items():
+    for key, value in build_public_payment_form(form).items():
         if value is None:
             continue
         safe_key = html.escape(str(key), quote=True)
@@ -516,6 +559,41 @@ def _preview_text(value: str, *, limit: int = 24) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + "..."
+
+
+def _build_mobile_charset_log_payload(form: dict) -> dict:
+    goods_raw = str(form.get("_RCL_GOODS_RAW") or "")
+    goods_final = str(form.get("P_GOODS") or "")
+    uname_raw = str(form.get("_RCL_UNAME_RAW") or "")
+    uname_final = str(form.get("P_UNAME") or "")
+    return {
+        "order_id": form.get("P_OID"),
+        "p_charset": form.get("P_CHARSET"),
+        "ascii_safe_mode": bool(form.get("_RCL_ASCII_SAFE_MODE")),
+        "goods_source": form.get("_RCL_GOODS_SOURCE"),
+        "goods_preview": _preview_text(goods_raw),
+        "uname_preview": _preview_text(uname_raw),
+        "contains_non_ascii": {
+            "goods_raw": contains_non_ascii(goods_raw),
+            "goods_final": contains_non_ascii(goods_final),
+            "uname_raw": contains_non_ascii(uname_raw),
+            "uname_final": contains_non_ascii(uname_final),
+        },
+        "goods_raw_preview": _preview_text(goods_raw),
+        "goods_final_preview": _preview_text(goods_final),
+        "uname_raw_preview": _preview_text(uname_raw),
+        "uname_final_preview": _preview_text(uname_final),
+        "html_charset": INICIS_MOBILE_HTML_CHARSET,
+        "form_accept_charset": INICIS_MOBILE_HTML_CHARSET,
+    }
+
+
+def build_public_payment_form(form: dict) -> dict:
+    return {
+        key: value
+        for key, value in form.items()
+        if not str(key).startswith("_")
+    }
 
 
 def render_inicis_html(form: dict, *, free_return_url: str = "", free_token: str = "") -> HTMLResponse:
@@ -687,8 +765,8 @@ def render_mobile_inicis_html(form: dict, *, free_return_url: str = "", free_tok
     <!doctype html>
     <html lang="ko">
     <head>
-      <meta charset="utf-8" />
-      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+      <meta charset="{INICIS_MOBILE_HTML_CHARSET}" />
+      <meta http-equiv="Content-Type" content="text/html; charset={INICIS_MOBILE_HTML_CHARSET}" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>ReconnectLab Mobile Payment</title>
       <style>
@@ -716,7 +794,7 @@ def render_mobile_inicis_html(form: dict, *, free_return_url: str = "", free_tok
     </head>
     <body>
       <div class="box">모바일 결제창으로 이동 중입니다.</div>
-      <form id="inicisMobilePayForm" method="POST" action="{MOBILE_PAYMENT_URL}" accept-charset="UTF-8" style="display:none;">
+      <form id="inicisMobilePayForm" method="POST" action="{MOBILE_PAYMENT_URL}" accept-charset="{INICIS_MOBILE_HTML_CHARSET}" style="display:none;">
         {inputs_html}
       </form>
       <script>
@@ -731,7 +809,7 @@ def render_mobile_inicis_html(form: dict, *, free_return_url: str = "", free_tok
     </body>
     </html>
     """
-    return HTMLResponse(content=html, media_type="text/html; charset=UTF-8")
+    return HTMLResponse(content=html, media_type=f"text/html; charset={INICIS_MOBILE_HTML_CHARSET}")
 
 
 def build_mobile_cancel_target(*, free_return_url: str = "", free_token: str = "", code: str = "", msg: str = "", mode: str = "cancel", stage: str = "", order_id: str = "") -> str:
@@ -793,6 +871,7 @@ async def pay_start_page(
             order_id=form.get("P_OID"),
             mobile_detected=True,
             payment_url=MOBILE_PAYMENT_URL,
+            ascii_safe_mode=bool(form.get("_RCL_ASCII_SAFE_MODE")),
             selected_method=form.get("P_INI_PAYMENT"),
             final_reserved=form.get("P_RESERVED"),
             has_timestamp=bool(form.get("P_TIMESTAMP")),
@@ -806,21 +885,22 @@ async def pay_start_page(
                 "P_OID": form.get("P_OID"),
                 "P_AMT": form.get("P_AMT"),
                 "P_GOODS": form.get("P_GOODS"),
+                "P_UNAME": form.get("P_UNAME"),
+                "P_CHARSET": form.get("P_CHARSET"),
                 "P_NEXT_URL": form.get("P_NEXT_URL"),
                 "P_RETURN_URL": form.get("P_RETURN_URL"),
                 "P_CANCEL_URL": form.get("P_CANCEL_URL"),
                 "P_INI_PAYMENT": form.get("P_INI_PAYMENT"),
                 "P_RESERVED": form.get("P_RESERVED"),
             },
+            goods_raw_preview=_preview_text(str(form.get("_RCL_GOODS_RAW") or "")),
+            goods_final_preview=_preview_text(str(form.get("P_GOODS") or "")),
+            uname_raw_preview=_preview_text(str(form.get("_RCL_UNAME_RAW") or "")),
+            uname_final_preview=_preview_text(str(form.get("P_UNAME") or "")),
         )
         log_payment_mobile(
             "payment.mobile.charset.prepare",
-            order_id=form.get("P_OID"),
-            p_charset=form.get("P_CHARSET"),
-            goods_preview=_preview_text(str(form.get("P_GOODS") or "")),
-            uname_preview=_preview_text(str(form.get("P_UNAME") or "")),
-            html_charset="UTF-8",
-            form_accept_charset="UTF-8",
+            **_build_mobile_charset_log_payload(form),
         )
         return render_mobile_inicis_html(
             form,
@@ -860,6 +940,7 @@ async def inicis_prepare(payload: PreparePaymentIn, request: Request):
             order_id=form.get("P_OID"),
             mobile_detected=True,
             payment_url=MOBILE_PAYMENT_URL,
+            ascii_safe_mode=bool(form.get("_RCL_ASCII_SAFE_MODE")),
             selected_method=form.get("P_INI_PAYMENT"),
             final_reserved=form.get("P_RESERVED"),
             has_timestamp=bool(form.get("P_TIMESTAMP")),
@@ -873,21 +954,22 @@ async def inicis_prepare(payload: PreparePaymentIn, request: Request):
                 "P_OID": form.get("P_OID"),
                 "P_AMT": form.get("P_AMT"),
                 "P_GOODS": form.get("P_GOODS"),
+                "P_UNAME": form.get("P_UNAME"),
+                "P_CHARSET": form.get("P_CHARSET"),
                 "P_NEXT_URL": form.get("P_NEXT_URL"),
                 "P_RETURN_URL": form.get("P_RETURN_URL"),
                 "P_CANCEL_URL": form.get("P_CANCEL_URL"),
                 "P_INI_PAYMENT": form.get("P_INI_PAYMENT"),
                 "P_RESERVED": form.get("P_RESERVED"),
             },
+            goods_raw_preview=_preview_text(str(form.get("_RCL_GOODS_RAW") or "")),
+            goods_final_preview=_preview_text(str(form.get("P_GOODS") or "")),
+            uname_raw_preview=_preview_text(str(form.get("_RCL_UNAME_RAW") or "")),
+            uname_final_preview=_preview_text(str(form.get("P_UNAME") or "")),
         )
         log_payment_mobile(
             "payment.mobile.charset.prepare",
-            order_id=form.get("P_OID"),
-            p_charset=form.get("P_CHARSET"),
-            goods_preview=_preview_text(str(form.get("P_GOODS") or "")),
-            uname_preview=_preview_text(str(form.get("P_UNAME") or "")),
-            html_charset="UTF-8",
-            form_accept_charset="UTF-8",
+            **_build_mobile_charset_log_payload(form),
         )
     else:
         form = build_inicis_form(
@@ -903,7 +985,7 @@ async def inicis_prepare(payload: PreparePaymentIn, request: Request):
         "ok": True,
         "mobile_detected": mobile_detected,
         "payment_url": MOBILE_PAYMENT_URL if mobile_detected else "https://stdpay.inicis.com/stdjs/INIStdPay.js",
-        "form": form,
+        "form": build_public_payment_form(form),
     }
 
 

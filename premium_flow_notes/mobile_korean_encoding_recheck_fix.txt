@@ -1,0 +1,73 @@
+1. 수정한 파일 목록
+- `app/routes_payments.py`
+- `premium_flow_notes/mobile_korean_encoding_recheck_fix.txt`
+
+2. 수정한 함수 목록
+- `resolve_premium_goodname()` 신규 추가
+- `normalize_mobile_goods_name()` 신규 추가
+- `normalize_mobile_buyer_name()` 신규 추가
+- `contains_non_ascii()` 신규 추가
+- `build_mobile_payment_form()` 수정
+- `_build_mobile_charset_log_payload()` 신규 추가
+- `_render_hidden_inputs()` 수정
+- `build_public_payment_form()` 신규 추가
+- `render_mobile_inicis_html()` 최소 수정
+- `/pay/start` 모바일 prepare 로그 수정
+- `/api/payments/inicis/prepare` 모바일 prepare 로그 수정
+
+3. 현재 코드에서 한글 깨짐의 가장 유력한 원인
+- 서버 HTML charset 선언 부족보다는 `mobile.inicis`로 POST되는 `P_GOODS`, `P_UNAME` 같은 실제 전송값이 모바일 PG 내부에서 안정적으로 해석되지 않는 쪽이 더 유력하다.
+- `routes_payments.py` 내부 문자열 소스 재점검 결과, `PREMIUM_GOODNAME` 기본값과 `buyer_name` 기본값은 UTF-8 소스 기준 정상 한글이며 중간 `.encode()`/`.decode()` 변환은 없었다.
+- 따라서 직접 문제는 "모바일 PG 전송 필드에서 한글 원문을 그대로 보냈을 때 깨질 수 있는 구간"으로 보는 것이 타당하다.
+
+4. goods/uname 원문 로그 확인 결과
+- `PREMIUM_GOODNAME`는 `os.getenv("PREMIUM_GOODNAME")`를 먼저 읽고, 비어 있으면 기본값 `리커넥트랩 프리미엄 AI 리포트`를 사용하도록 재확인했다.
+- `buyer_name`, `buyer_email`, `buyer_tel`은 모바일 prepare 진입 시 전달값을 그대로 사용하고, 비어 있으면 기존 기본값으로 채운다.
+- 모바일 로그에 아래 항목을 추가해 원문과 최종 전송값을 분리해서 확인 가능하게 했다.
+- `goods_source=env/default`
+- `goods_preview`
+- `uname_preview`
+- `contains_non_ascii`
+- `goods_raw_preview`
+- `goods_final_preview`
+- `uname_raw_preview`
+- `uname_final_preview`
+- 이번 환경에서는 실제 서버를 띄워 실시간 로그까지 재현하지는 못했다. 대신 코드 경로 기준으로 원문이 로그 시점까지 별도 인코딩 변환 없이 유지되도록 보강했다.
+
+5. 최종 적용한 P_CHARSET 상수값
+- `INICIS_MOBILE_CHARSET = "utf8"`
+- HTML 쪽은 같은 기준에서 파생된 `INICIS_MOBILE_HTML_CHARSET = "UTF-8"`를 사용하도록 연결했다.
+
+6. ascii_safe fallback 적용 여부
+- 적용했다.
+- 대상은 모바일 KG이니시스 전송 필드만이다.
+- 기본값은 `INICIS_MOBILE_ASCII_SAFE_TEXT=true` 이다.
+- 서비스 내부 페이지 한글 문구는 유지하고, `P_GOODS`/`P_UNAME`만 fallback 가능하게 분리했다.
+
+7. fallback 전/후 전송값 예시
+- `ascii_safe_mode=false`
+- `P_GOODS`: `리커넥트랩 프리미엄 AI 리포트`
+- `P_UNAME`: `홍길동`
+- `ascii_safe_mode=true`
+- `P_GOODS`: `ReconnectLab Premium Report`
+- `P_UNAME`: `customer`
+
+8. 테스트 결과
+- 정적 코드 점검 결과:
+- `ascii_safe_mode=false`일 때 모바일 로그는 원문 기준 preview와 `contains_non_ascii=true` 여부를 남기게 된다.
+- `ascii_safe_mode=true`일 때 모바일 전송 필드는 `P_GOODS`, `P_UNAME`가 ASCII fallback 값으로 바뀐다.
+- `P_CHARSET`는 모바일 폼에서 항상 `utf8` 상수를 사용한다.
+- `render_mobile_inicis_html()`는 기존 구조를 유지하면서 `meta charset`, `accept-charset`, `HTMLResponse media_type`을 상수 기준으로만 정리했다.
+- `_render_hidden_inputs()`와 `/api/payments/inicis/prepare` 응답은 내부 로그용 `_RCL_*` 키를 외부 전송에 섞지 않도록 처리했다.
+- 실제 모바일 결제창 비교 테스트와 실서버 로그 확인은 이 작업 환경에서 미실행이다.
+
+9. 남은 리스크
+- 실제 모바일 브라우저/이니시스 결제앱 내부에서 필드 표시가 어떻게 보이는지는 실기기 테스트가 아직 필요하다.
+- `INICIS_MOBILE_ASCII_SAFE_TEXT=true` 기본값은 안정성 우선이지만, 결제창 상품명/이름이 영문으로 보이게 된다.
+- `/api/payments/inicis/prepare`를 사용하는 프런트가 응답 form 필드 집합에 의존하고 있다면, 내부 `_RCL_*` 필드 비노출 변경을 같이 확인해야 한다.
+- 근본 원인이 PG 내부 문자열 렌더링이면 `utf8` 고정만으로는 완전하지 않을 수 있고, 이번 fallback이 실질적인 회피책이 된다.
+
+- 결론:
+- 직접 원인: 모바일 KG이니시스가 받는 실제 POST 필드 `P_GOODS`/`P_UNAME`의 한글 해석 구간이 가장 의심되며, HTML charset 선언만으로는 충분하지 않았다.
+- 보조 원인: 기존 로그가 원문 문자열과 최종 전송값을 분리해 보여주지 않아 env/default 소스와 실제 POST 값을 바로 대조하기 어려웠다.
+- 다음 모바일 테스트에서 가장 먼저 볼 로그: `payment.mobile.charset.prepare`
