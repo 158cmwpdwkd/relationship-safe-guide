@@ -17,11 +17,19 @@ router = APIRouter()
 # ✅ Render 환경변수 (KEY=PUBLIC_REPORT_BASE, VALUE=https://reconnectlab.co.kr)
 PUBLIC_REPORT_BASE = (os.getenv("PUBLIC_REPORT_BASE") or "").strip().rstrip("/")
 FREE_REPORT_PUBLIC_BASE_URL = "https://reconnectlab.co.kr"
-SOLAPI_TEMPLATE_FREE = (
-    os.getenv("SOLAPI_TEMPLATE_FREE")
-    or os.getenv("KAKAO_ALERT_FREE_TEMPLATE_CODE")
-    or ""
-).strip()
+
+
+def _resolve_free_template_config() -> tuple[str, str]:
+    direct_value = (os.getenv("SOLAPI_TEMPLATE_FREE") or "").strip()
+    if direct_value:
+        return direct_value, "SOLAPI_TEMPLATE_FREE"
+    fallback_value = (os.getenv("KAKAO_ALERT_FREE_TEMPLATE_CODE") or "").strip()
+    if fallback_value:
+        return fallback_value, "KAKAO_ALERT_FREE_TEMPLATE_CODE"
+    return "", "missing"
+
+
+SOLAPI_TEMPLATE_FREE, SOLAPI_TEMPLATE_FREE_SOURCE = _resolve_free_template_config()
 
 
 def log_kakao_alert(event: str, **payload) -> None:
@@ -74,11 +82,19 @@ def _send_free_report_kakao_alert(*, report: Report, session: UserSession, db) -
         return
 
     report_url = _build_free_report_kakao_url(token=report.report_token)
+    log_kakao_alert(
+        "solapi.alert.template.resolve",
+        type="free",
+        template_id=SOLAPI_TEMPLATE_FREE,
+        template_source=SOLAPI_TEMPLATE_FREE_SOURCE,
+        template_missing=not bool(SOLAPI_TEMPLATE_FREE),
+    )
     sent = send_kakao_alert(
         phone=phone,
         template_id=SOLAPI_TEMPLATE_FREE,
         url_value=report_url,
         alert_type="free",
+        template_source=SOLAPI_TEMPLATE_FREE_SOURCE,
     )
     if not sent:
         log_kakao_alert(
@@ -87,6 +103,8 @@ def _send_free_report_kakao_alert(*, report: Report, session: UserSession, db) -
             sid=report.sid,
             report_token=report.report_token,
             to_preview=f"{phone[:5]}***{phone[-3:]}",
+            template_id=SOLAPI_TEMPLATE_FREE,
+            template_source=SOLAPI_TEMPLATE_FREE_SOURCE,
         )
         return
 
@@ -97,6 +115,8 @@ def _send_free_report_kakao_alert(*, report: Report, session: UserSession, db) -
         sid=report.sid,
         report_token=report.report_token,
         to_preview=f"{phone[:5]}***{phone[-3:]}",
+        template_id=SOLAPI_TEMPLATE_FREE,
+        template_source=SOLAPI_TEMPLATE_FREE_SOURCE,
     )
 
 @router.post("/api/survey/free", response_model=FreeOut)

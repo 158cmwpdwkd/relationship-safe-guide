@@ -28,11 +28,19 @@ from .services.kakao_alert import normalize_phone, send_kakao_alert
 
 router = APIRouter(prefix="/api/premium", tags=["premium"])
 PREMIUM_REPORT_PUBLIC_BASE_URL = "https://reconnectlab.co.kr"
-SOLAPI_TEMPLATE_PREMIUM = (
-    os.getenv("SOLAPI_TEMPLATE_PREMIUM")
-    or os.getenv("KAKAO_ALERT_PREMIUM_TEMPLATE_CODE")
-    or ""
-).strip()
+
+
+def _resolve_premium_template_config() -> tuple[str, str]:
+    direct_value = (os.getenv("SOLAPI_TEMPLATE_PREMIUM") or "").strip()
+    if direct_value:
+        return direct_value, "SOLAPI_TEMPLATE_PREMIUM"
+    fallback_value = (os.getenv("KAKAO_ALERT_PREMIUM_TEMPLATE_CODE") or "").strip()
+    if fallback_value:
+        return fallback_value, "KAKAO_ALERT_PREMIUM_TEMPLATE_CODE"
+    return "", "missing"
+
+
+SOLAPI_TEMPLATE_PREMIUM, SOLAPI_TEMPLATE_PREMIUM_SOURCE = _resolve_premium_template_config()
 
 
 def get_db():
@@ -89,11 +97,19 @@ def _send_premium_report_kakao_alert(*, premium_report, db: Session) -> None:
         return
 
     report_url = _build_premium_report_kakao_url(token=premium_report.premium_report_token)
+    log_kakao_alert(
+        "solapi.alert.template.resolve",
+        type="premium",
+        template_id=SOLAPI_TEMPLATE_PREMIUM,
+        template_source=SOLAPI_TEMPLATE_PREMIUM_SOURCE,
+        template_missing=not bool(SOLAPI_TEMPLATE_PREMIUM),
+    )
     sent = send_kakao_alert(
         phone=phone,
         template_id=SOLAPI_TEMPLATE_PREMIUM,
         url_value=report_url,
         alert_type="premium",
+        template_source=SOLAPI_TEMPLATE_PREMIUM_SOURCE,
     )
     if not sent:
         log_kakao_alert(
@@ -102,6 +118,8 @@ def _send_premium_report_kakao_alert(*, premium_report, db: Session) -> None:
             order_id=premium_report.order_id,
             premium_report_token=premium_report.premium_report_token,
             to_preview=f"{phone[:5]}***{phone[-3:]}",
+            template_id=SOLAPI_TEMPLATE_PREMIUM,
+            template_source=SOLAPI_TEMPLATE_PREMIUM_SOURCE,
         )
         return
 
@@ -112,6 +130,8 @@ def _send_premium_report_kakao_alert(*, premium_report, db: Session) -> None:
         order_id=premium_report.order_id,
         premium_report_token=premium_report.premium_report_token,
         to_preview=f"{phone[:5]}***{phone[-3:]}",
+        template_id=SOLAPI_TEMPLATE_PREMIUM,
+        template_source=SOLAPI_TEMPLATE_PREMIUM_SOURCE,
     )
 
 

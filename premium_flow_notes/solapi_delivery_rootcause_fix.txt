@@ -1,0 +1,132 @@
+1. Modified files
+- app/services/kakao_alert.py
+- app/routes_survey.py
+- app/routes_premium.py
+
+2. Modified functions
+- app/services/kakao_alert.py
+  - _extract_response_fields(body)
+  - _body_shape_summary(payload)
+  - _evaluate_solapi_failure(http_status, body)
+  - send_kakao_alert(phone, template_id, url_value, alert_type=None, template_source=None)
+- app/routes_survey.py
+  - _resolve_free_template_config()
+  - _send_free_report_kakao_alert(...)
+- app/routes_premium.py
+  - _resolve_premium_template_config()
+  - _send_premium_report_kakao_alert(...)
+
+3. Free/Premium template_id actual source
+- Free call path
+  - caller: app/routes_survey.py::_send_free_report_kakao_alert()
+  - sent value: SOLAPI_TEMPLATE_FREE
+  - fallback order: SOLAPI_TEMPLATE_FREE -> KAKAO_ALERT_FREE_TEMPLATE_CODE -> ""
+  - local check result: not found in .env, not found in current process env
+  - local source result: missing
+  - local template_id result: likely empty string
+- Premium call path
+  - caller: app/routes_premium.py::_send_premium_report_kakao_alert()
+  - sent value: SOLAPI_TEMPLATE_PREMIUM
+  - fallback order: SOLAPI_TEMPLATE_PREMIUM -> KAKAO_ALERT_PREMIUM_TEMPLATE_CODE -> ""
+  - local check result: not found in .env, not found in current process env
+  - local source result: missing
+  - local template_id result: likely empty string
+
+4. Env fallback summary
+- Free template
+  - first: SOLAPI_TEMPLATE_FREE
+  - fallback: KAKAO_ALERT_FREE_TEMPLATE_CODE
+  - else: source=missing
+- Premium template
+  - first: SOLAPI_TEMPLATE_PREMIUM
+  - fallback: KAKAO_ALERT_PREMIUM_TEMPLATE_CODE
+  - else: source=missing
+- Service env
+  - API URL: SOLAPI_API_URL -> KAKAO_ALERT_API_URL -> https://api.solapi.com/messages/v4/send
+  - API KEY: SOLAPI_API_KEY -> KAKAO_ALERT_API_KEY
+  - API SECRET: SOLAPI_API_SECRET -> KAKAO_ALERT_API_SECRET
+  - PFID: SOLAPI_PFID -> KAKAO_ALERT_SENDER_KEY
+
+5. Final failure decision logic
+- validation_input
+  - invalid normalized phone
+  - empty template_id
+  - empty url_value
+  - reason=INVALID_MESSAGE_INPUT
+- validation_env
+  - missing API KEY or API SECRET or PFID
+  - reason=SOLAPI_ENV_MISSING
+- response_validation
+  - HTTP status >= 400
+  - success == false
+  - status == FAILED
+  - errorCode exists
+  - errorMessage exists
+  - statusCode is not a success code
+  - statusMessage contains FAIL / ERROR / INVALID / DENIED / UNAUTHORIZED
+  - code is not a success code
+  - message contains FAIL / ERROR / INVALID / DENIED / UNAUTHORIZED
+- request_exception
+  - request-layer exception such as httpx error
+
+6. Fields to check in actual response logs
+- solapi.alert.request
+  - api_url
+  - to_preview
+  - template_id
+  - template_source
+  - pfid_preview
+  - variables_keys
+  - body_shape_summary.messages_count
+  - body_shape_summary.has_to
+  - body_shape_summary.has_kakaoOptions
+  - body_shape_summary.has_pfId
+  - body_shape_summary.has_templateId
+- solapi.alert.response
+  - http_status
+  - raw_response_text
+  - parsed_json_keys
+  - parsed_error_code
+  - parsed_error_message
+  - parsed_status_code
+  - parsed_status_message
+  - parsed_code
+  - parsed_message
+- solapi.alert.fail
+  - reason
+  - failure_stage
+  - template_id
+  - template_source
+
+7. Most likely direct cause
+- The most likely direct cause currently visible is that template_id itself is empty at runtime.
+- Why this is the leading cause
+  - both callers resolve template_id from env at call time
+  - local .env does not define SOLAPI_TEMPLATE_FREE / SOLAPI_TEMPLATE_PREMIUM
+  - local .env does not define KAKAO_ALERT_FREE_TEMPLATE_CODE / KAKAO_ALERT_PREMIUM_TEMPLATE_CODE
+  - current process env also does not expose those keys
+  - previous implementation did not log template source or raw response details clearly enough
+
+8. First logs to inspect on the next test
+- solapi.alert.template.resolve
+  - template_id must not be empty
+  - template_source must not be missing
+- solapi.alert.request
+  - body_shape_summary.has_templateId must be true
+  - variables_keys must be ["#{url}"]
+- solapi.alert.response
+  - http_status
+  - parsed_error_code / parsed_error_message
+  - parsed_status_code / parsed_status_message
+  - parsed_code / parsed_message
+  - raw_response_text
+- solapi.alert.fail
+  - failure_stage must tell whether the failure is validation_input / validation_env / response_validation / request_exception
+
+- Conclusion:
+- Direct cause:
+  The strongest currently confirmed cause is an empty runtime template_id for free and premium alert sends. The code now logs template resolution before send and logs INVALID_MESSAGE_INPUT with template_source when template_id is blank.
+- Secondary cause:
+  The old implementation only kept a shallow response summary, so auth failure, template mismatch, and Solapi response errors were hard to distinguish.
+- Next log to check first:
+  solapi.alert.template.resolve, then solapi.alert.request, then solapi.alert.response, then solapi.alert.fail
