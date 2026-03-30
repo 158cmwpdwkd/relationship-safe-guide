@@ -50,8 +50,8 @@ def resolve_free_report_html(token: str) -> HTMLResponse:
         report, session = _load_free_report_by_token(token=token, db=db)
         if report.free_kakao_sent_at is not None:
             log_kakao_alert(
-                "kakao.alert.skip.already_sent",
-                alert_type="free",
+                "solapi.alert.skip.already_sent",
+                type="free",
                 sid=report.sid,
                 report_token=report.report_token,
                 sent_at=report.free_kakao_sent_at,

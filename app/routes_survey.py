@@ -17,7 +17,11 @@ router = APIRouter()
 # ✅ Render 환경변수 (KEY=PUBLIC_REPORT_BASE, VALUE=https://reconnectlab.co.kr)
 PUBLIC_REPORT_BASE = (os.getenv("PUBLIC_REPORT_BASE") or "").strip().rstrip("/")
 FREE_REPORT_PUBLIC_BASE_URL = "https://reconnectlab.co.kr"
-KAKAO_ALERT_FREE_TEMPLATE_CODE = (os.getenv("KAKAO_ALERT_FREE_TEMPLATE_CODE") or "").strip()
+SOLAPI_TEMPLATE_FREE = (
+    os.getenv("SOLAPI_TEMPLATE_FREE")
+    or os.getenv("KAKAO_ALERT_FREE_TEMPLATE_CODE")
+    or ""
+).strip()
 
 
 def log_kakao_alert(event: str, **payload) -> None:
@@ -52,11 +56,17 @@ def _build_free_report_kakao_url(*, token: str) -> str:
 def _send_free_report_kakao_alert(*, report: Report, session: UserSession, db) -> None:
     phone = normalize_phone(session.phone)
     if not phone:
+        log_kakao_alert(
+            "solapi.alert.skip.phone_missing",
+            type="free",
+            sid=report.sid,
+            report_token=report.report_token,
+        )
         return
     if report.free_kakao_sent_at is not None:
         log_kakao_alert(
-            "kakao.alert.skip.already_sent",
-            alert_type="free",
+            "solapi.alert.skip.already_sent",
+            type="free",
             sid=report.sid,
             report_token=report.report_token,
             sent_at=report.free_kakao_sent_at,
@@ -66,30 +76,27 @@ def _send_free_report_kakao_alert(*, report: Report, session: UserSession, db) -
     report_url = _build_free_report_kakao_url(token=report.report_token)
     sent = send_kakao_alert(
         phone=phone,
-        template_code=KAKAO_ALERT_FREE_TEMPLATE_CODE,
-        variables={
-            "report_url": report_url,
-            "token": report.report_token,
-        },
+        template_id=SOLAPI_TEMPLATE_FREE,
+        url_value=report_url,
+        alert_type="free",
     )
     if not sent:
         log_kakao_alert(
-            "kakao.alert.fail",
-            alert_type="free",
+            "solapi.alert.fail",
+            type="free",
             sid=report.sid,
             report_token=report.report_token,
-            phone=phone,
+            to_preview=f"{phone[:5]}***{phone[-3:]}",
         )
         return
 
     report.free_kakao_sent_at = datetime.utcnow()
     db.commit()
     log_kakao_alert(
-        "kakao.alert.free.send",
+        "solapi.alert.free.send",
         sid=report.sid,
         report_token=report.report_token,
-        phone=phone,
-        report_url=report_url,
+        to_preview=f"{phone[:5]}***{phone[-3:]}",
     )
 
 @router.post("/api/survey/free", response_model=FreeOut)

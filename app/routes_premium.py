@@ -28,7 +28,11 @@ from .services.kakao_alert import normalize_phone, send_kakao_alert
 
 router = APIRouter(prefix="/api/premium", tags=["premium"])
 PREMIUM_REPORT_PUBLIC_BASE_URL = "https://reconnectlab.co.kr"
-KAKAO_ALERT_PREMIUM_TEMPLATE_CODE = (os.getenv("KAKAO_ALERT_PREMIUM_TEMPLATE_CODE") or "").strip()
+SOLAPI_TEMPLATE_PREMIUM = (
+    os.getenv("SOLAPI_TEMPLATE_PREMIUM")
+    or os.getenv("KAKAO_ALERT_PREMIUM_TEMPLATE_CODE")
+    or ""
+).strip()
 
 
 def get_db():
@@ -57,8 +61,8 @@ def _send_premium_report_kakao_alert(*, premium_report, db: Session) -> None:
     session = db.query(UserSession).filter(UserSession.sid == premium_report.sid).first()
     if not session:
         log_kakao_alert(
-            "kakao.alert.fail",
-            alert_type="premium",
+            "solapi.alert.fail",
+            type="premium",
             order_id=premium_report.order_id,
             premium_report_token=premium_report.premium_report_token,
             reason="SESSION_NOT_FOUND",
@@ -67,11 +71,17 @@ def _send_premium_report_kakao_alert(*, premium_report, db: Session) -> None:
 
     phone = normalize_phone(session.phone)
     if not phone:
+        log_kakao_alert(
+            "solapi.alert.skip.phone_missing",
+            type="premium",
+            order_id=premium_report.order_id,
+            premium_report_token=premium_report.premium_report_token,
+        )
         return
     if premium_report.premium_kakao_sent_at is not None:
         log_kakao_alert(
-            "kakao.alert.skip.already_sent",
-            alert_type="premium",
+            "solapi.alert.skip.already_sent",
+            type="premium",
             order_id=premium_report.order_id,
             premium_report_token=premium_report.premium_report_token,
             sent_at=premium_report.premium_kakao_sent_at,
@@ -81,30 +91,27 @@ def _send_premium_report_kakao_alert(*, premium_report, db: Session) -> None:
     report_url = _build_premium_report_kakao_url(token=premium_report.premium_report_token)
     sent = send_kakao_alert(
         phone=phone,
-        template_code=KAKAO_ALERT_PREMIUM_TEMPLATE_CODE,
-        variables={
-            "report_url": report_url,
-            "token": premium_report.premium_report_token,
-        },
+        template_id=SOLAPI_TEMPLATE_PREMIUM,
+        url_value=report_url,
+        alert_type="premium",
     )
     if not sent:
         log_kakao_alert(
-            "kakao.alert.fail",
-            alert_type="premium",
+            "solapi.alert.fail",
+            type="premium",
             order_id=premium_report.order_id,
             premium_report_token=premium_report.premium_report_token,
-            phone=phone,
+            to_preview=f"{phone[:5]}***{phone[-3:]}",
         )
         return
 
     premium_report.premium_kakao_sent_at = datetime.utcnow()
     db.commit()
     log_kakao_alert(
-        "kakao.alert.premium.send",
+        "solapi.alert.premium.send",
         order_id=premium_report.order_id,
         premium_report_token=premium_report.premium_report_token,
-        phone=phone,
-        report_url=report_url,
+        to_preview=f"{phone[:5]}***{phone[-3:]}",
     )
 
 
