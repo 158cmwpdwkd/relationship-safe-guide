@@ -120,12 +120,11 @@ def _extract_response_fields(body) -> dict:
 
 
 def _body_shape_summary(payload: dict) -> dict:
-    messages = payload.get("messages")
-    message = messages[0] if isinstance(messages, list) and messages else {}
+    message = payload.get("message")
     kakao_options = message.get("kakaoOptions") if isinstance(message, dict) else {}
     variables = kakao_options.get("variables") if isinstance(kakao_options, dict) else {}
     return {
-        "messages_count": len(messages) if isinstance(messages, list) else 0,
+        "has_message": isinstance(message, dict),
         "has_to": bool(message.get("to")) if isinstance(message, dict) else False,
         "has_kakaoOptions": isinstance(kakao_options, dict),
         "has_pfId": bool(kakao_options.get("pfId")) if isinstance(kakao_options, dict) else False,
@@ -223,19 +222,17 @@ def _build_solapi_auth_header(*, api_key: str, api_secret: str) -> str:
 
 def _build_solapi_payload(*, phone: str, template_id: str, url_value: str) -> dict:
     return {
-        "messages": [
-            {
-                "to": phone,
-                "kakaoOptions": {
-                    "pfId": SOLAPI_PFID,
-                    "templateId": template_id,
-                    "disableSms": True,
-                    "variables": {
-                        "#{url}": url_value,
-                    },
+        "message": {
+            "to": phone,
+            "kakaoOptions": {
+                "pfId": SOLAPI_PFID,
+                "templateId": template_id,
+                "disableSms": True,
+                "variables": {
+                    "#{url}": url_value,
                 },
-            }
-        ]
+            },
+        }
     }
 
 

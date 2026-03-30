@@ -1,0 +1,96 @@
+1. Modified files
+- app/services/kakao_alert.py
+
+2. Modified functions
+- _body_shape_summary(payload)
+- _build_solapi_payload(phone, template_id, url_value)
+
+3. Previous body shape
+```json
+{
+  "messages": [
+    {
+      "to": "01012345678",
+      "kakaoOptions": {
+        "pfId": "PFID",
+        "templateId": "TEMPLATE_ID",
+        "disableSms": true,
+        "variables": {
+          "#{url}": "https://example.com/..."
+        }
+      }
+    }
+  ]
+}
+```
+
+4. Updated body shape
+```json
+{
+  "message": {
+    "to": "01012345678",
+    "kakaoOptions": {
+      "pfId": "PFID",
+      "templateId": "TEMPLATE_ID",
+      "disableSms": true,
+      "variables": {
+        "#{url}": "https://example.com/..."
+      }
+    }
+  }
+}
+```
+
+5. Request log changes
+- removed array-based summary field
+  - messages_count
+- added/kept single-message shape fields
+  - has_message
+  - has_to
+  - has_kakaoOptions
+  - has_pfId
+  - has_templateId
+  - variables_keys
+- request log still includes
+  - api_url
+  - to_preview
+  - template_id
+  - template_source
+  - pfid_preview
+  - body_shape_summary
+
+6. Test result
+- Code inspection confirms payload builder now creates top-level message object instead of messages array.
+- Code inspection confirms request summary now checks payload["message"] and logs has_message.
+- Local live send test was not executed in this session.
+- Therefore the expected next confirmation point is the first free send log:
+  - solapi.alert.request should show has_message=true
+  - variables_keys should show ["#{url}"]
+  - solapi.alert.response should no longer contain the old ValidationError text:
+    - "message 필수입니다."
+    - "messages 사용할 수 없습니다."
+
+7. Remaining risk
+- If the endpoint also expects a different path or different response schema, request shape fix alone may not be sufficient.
+- If template_id or pfId is still wrong, ValidationError may disappear but send can still fail for template/auth reasons.
+- Live verification is still required because this session could not run an end-to-end outbound request.
+
+- Conclusion:
+- Direct cause:
+  The direct cause of the reported 400 ValidationError was the top-level payload shape using messages[] instead of message.
+- Modified actual body shape:
+```json
+{
+  "message": {
+    "to": "01012345678",
+    "kakaoOptions": {
+      "pfId": "PFID",
+      "templateId": "TEMPLATE_ID",
+      "disableSms": true,
+      "variables": {
+        "#{url}": "https://example.com/..."
+      }
+    }
+  }
+}
+```
